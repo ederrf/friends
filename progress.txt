@@ -1,0 +1,89 @@
+Friends - progress tracker
+
+Como manter este arquivo:
+- este arquivo e obrigatorio e deve ser atualizado ao final de toda iteracao relevante
+- a entrada mais recente deve ficar sempre no topo
+- nao apagar entradas antigas; este arquivo e o historico operacional do projeto
+- se houver mudanca de arquitetura, escopo, stack ou direcao, atualizar este arquivo e o PRD no mesmo passo
+- usar sempre o formato padrao abaixo
+
+Formato padrao para novas entradas:
+Data: YYYY-MM-DD
+Iteracao: nome curto da iteracao
+Resumo: texto curto com o que foi feito
+Decisoes:
+- item
+- item
+Arquivos alterados:
+- arquivo
+- arquivo
+Pendencias:
+- item
+- item
+Proximo passo sugerido:
+- item
+- item
+
+Data: 2026-04-18
+Iteracao: renomeacao de arquivo legado
+Resumo: o arquivo legado do prototipo visual foi renomeado para refletir o nome oficial do app.
+Decisoes:
+- manter o arquivo legado por enquanto, mas com nome alinhado a `Friends`
+- usar `friends-dashboard.jsx` como referencia historica ate o app real ser estruturado
+Arquivos alterados:
+- friends-dashboard.jsx
+- progress.txt
+Pendencias:
+- estruturar o repositorio real com `frontend/` e `backend/`
+- decidir quando o arquivo legado podera ser arquivado ou removido
+Proximo passo sugerido:
+- iniciar a fundacao tecnica do projeto conforme o PRD
+- portar o que for util do prototipo legado para a nova estrutura
+
+Data: 2026-04-18
+Iteracao: revisao do PRD e definicao da arquitetura
+Resumo: o PRD foi reestruturado para ficar mais tecnico, orientado por handoff e alinhado com a stack do projeto `money`.
+Decisoes:
+- remover do PRD as atividades que ja estavam marcadas como concluidas
+- explicar no inicio do PRD e deste arquivo como o `progress.txt` deve ser mantido
+- quebrar backlog em atividades tecnicas menores e implementaveis
+- definir arquitetura de cara seguindo a linha do projeto `/Users/eder/Projects/money`
+- adotar frontend com React, TypeScript, Vite, React Router e Tailwind CSS
+- adotar backend com Python, FastAPI, Pydantic, SQLAlchemy async, Alembic e SQLite
+- usar SQLite como banco oficial da v1
+- manter Evernote obrigatorio e Google Calendar no escopo
+Arquivos alterados:
+- PRD.md
+- progress.txt
+Pendencias:
+- transformar o repositorio atual em uma estrutura real com `frontend/` e `backend/`
+- criar a base do backend com FastAPI, config, database e models
+- criar a base do frontend com Vite, React Router e layout inicial
+- criar a migration inicial do SQLite
+Proximo passo sugerido:
+- estruturar o repositorio no formato definido no PRD
+- implementar primeiro a fundacao tecnica antes de portar o prototipo visual antigo
+
+Data: 2026-04-18
+Iteracao: definicao inicial de direcao do projeto
+Resumo: criacao inicial do PRD e do progress tracker do projeto.
+Decisoes:
+- o nome do app passa a ser Friends
+- o projeto e um app para uso pessoal, nao um produto para venda
+- Todoist saiu do escopo
+- integracao com Evernote e obrigatoria
+- o objetivo principal do Evernote e receber append das anotacoes e interacoes por amigo
+- integracao com Google Calendar continua desejada
+- o app deve ser construido iterativamente
+- o projeto passa a ter um PRD central com atividades e campo Feito
+- este arquivo deve ser atualizado por qualquer IA ao fim de cada passo relevante
+Arquivos alterados:
+- PRD.md
+- progress.txt
+Pendencias:
+- transformar o prototipo atual em uma estrutura de app real
+- decidir a base tecnica da v1 local-first
+- comecar pela persistencia local e pelo CRUD funcional
+Proximo passo sugerido:
+- definir arquitetura
+- quebrar o PRD em backlog tecnico
