@@ -24,6 +24,35 @@ Proximo passo sugerido:
 - item
 - item
 
+Data: 2026-04-19
+Iteracao: Frontend detalhe do contato (13.17)
+Resumo: FriendDetailPage compoe header, edicao via modal, exclusao, gestao individual de tags, form rapido de interacao, timeline e ganchos de conversa. 5 componentes novos. Build limpo (68 modulos, 85 KB gzip).
+Decisoes:
+- pagina carrega 3 fetches em paralelo (friend, interactions, clusters); cada um tem seu loading/error/reload independente
+- registrar interacao recarrega tanto interactions quanto friend, porque a temperatura e `last_contact_at` mudam
+- TagsEditor chama API a cada add/remove (em vez de buffer local) — backend e fonte unica da verdade; menos chance de divergir
+- ganchos de conversa derivados de `/api/dashboard/clusters` em vez de criar `/api/friends/{id}/hooks` agora; quando o volume crescer, vale o endpoint dedicado
+- notas continuam editaveis via `FriendForm` no modal (mesmo fluxo do FriendsPage); editor inline pode vir depois se virar atrito
+- InteractionForm preserva o tipo escolhido entre submissoes — facilita registrar varios da mesma natureza
+- timeline com ponto colorido por tipo para varredura rapida; datas em pt-BR via `Intl.DateTimeFormat` com tz local
+- header inclui CTA de Editar e Excluir (delete navega de volta para /friends)
+- Stat helper interno para metricas no header com tone="warning" reaproveita o padrao do dashboard
+Arquivos alterados:
+- frontend/src/components/InteractionForm.tsx (novo)
+- frontend/src/components/InteractionTimeline.tsx (novo)
+- frontend/src/components/TagsEditor.tsx (novo)
+- frontend/src/components/FriendDetailHeader.tsx (novo)
+- frontend/src/components/HooksBlock.tsx (novo)
+- frontend/src/pages/FriendDetailPage.tsx (reescrito)
+- PRD.md (13.17 marcado como feito)
+Pendencias:
+- InterestsPage (13.18): lista com contagem + clusters + interesses unicos
+- importacao no frontend (13.19) — depende de 13.10 e 13.11 no backend
+- backend 13.10 (CSV) e 13.11 (VCF)
+- integracoes externas (13.12 Evernote, 13.13 Calendar)
+Proximo passo sugerido:
+- 13.18 (InterestsPage): consome `/api/interests` e `/api/dashboard/clusters` ja prontos; bloco de "interesses unicos" filtra por friend_count=1
+
 Data: 2026-04-18
 Iteracao: Frontend contatos (13.16)
 Resumo: CRUD visual de amigos. FriendsPage com lista de cards, filtros por categoria/cadencia/tag, criacao e edicao em modal, exclusao com confirmacao. Build limpo (61 modulos, 83 KB gzip).

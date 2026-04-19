@@ -752,25 +752,25 @@ Feito: Sim
 ### 13.17 Frontend detalhe do contato
 
 Atividade: criar `FriendDetailPage`
-Feito: Nao
+Feito: Sim
 
 Atividade: criar header com categoria, cadencia e temperatura
-Feito: Nao
+Feito: Sim
 
 Atividade: criar secao de notas do contato
-Feito: Nao
+Feito: Sim
 
 Atividade: criar secao de tags com adicao e remocao
-Feito: Nao
+Feito: Sim
 
 Atividade: criar formulario rapido de interacao
-Feito: Nao
+Feito: Sim
 
 Atividade: criar timeline de historico
-Feito: Nao
+Feito: Sim
 
 Atividade: criar bloco de ganchos de conversa
-Feito: Nao
+Feito: Sim
 
 ### 13.18 Frontend interesses
 
