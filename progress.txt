@@ -25,6 +25,35 @@ Proximo passo sugerido:
 - item
 
 Data: 2026-04-18
+Iteracao: Frontend contatos (13.16)
+Resumo: CRUD visual de amigos. FriendsPage com lista de cards, filtros por categoria/cadencia/tag, criacao e edicao em modal, exclusao com confirmacao. Build limpo (61 modulos, 83 KB gzip).
+Decisoes:
+- filtros sao enviados ao backend (`GET /api/friends?category=...`) em vez de filtrados em memoria — mantem a logica de filtro num lugar so e destrava filtro por tag sem redownload de todas as tags
+- uso um `Modal` generico com overlay + Escape + trava de scroll; bibliotecas (radix/headlessui) ficam para quando tiver 3+ dialogos
+- `FriendForm` e reusavel para criar e editar — recebe opcionalmente `friend` e alterna labels; em edicao oculta o campo de tags porque a gestao individual de tag vive no detalhe (13.17) e a API de tags ja tem endpoints dedicados (13.9)
+- `TagInput` e chip-based (Enter/virgula adiciona, Backspace remove ultimo); normaliza lowercase no commit do chip mas a normalizacao canonica ainda e no backend
+- cards em grid responsivo (1/2/3 colunas) com informacao compacta: nome clicavel (detalhe), categoria, cadencia, contato, tags, metricas de ultimo/proximo e badge de temperatura
+- toasts via react-hot-toast ja presente para confirmacoes/falhas; nao adicionei dependencia nova
+- deletar chama `window.confirm` antes — decisao pragmatica, UI de confirm custom pode vir depois se virar ruido
+- uniao discriminada `{kind: "none" | "new" | "edit"}` para estado do modal evita dois booleans conflitarem
+Arquivos alterados:
+- frontend/src/components/Modal.tsx (novo)
+- frontend/src/components/TagInput.tsx (novo)
+- frontend/src/components/FriendForm.tsx (novo)
+- frontend/src/components/FriendCard.tsx (novo)
+- frontend/src/pages/FriendsPage.tsx (reescrito)
+- PRD.md (13.16 marcado como feito)
+Pendencias:
+- FriendDetailPage (13.17): header, notas, tags com add/remove, timeline de interacoes, form rapido, ganchos de conversa
+- InterestsPage (13.18): lista com contagem + clusters + interesses unicos
+- importacao no frontend (13.19)
+- integracoes externas (13.12 Evernote, 13.13 Calendar)
+- backend 13.10 e 13.11 (importacao CSV/VCF)
+Proximo passo sugerido:
+- 13.17 (FriendDetailPage): a pagina mais densa — mas cada pedaco ja tem API pronta (friends, tags, interactions, interests/hooks via dashboard clusters)
+- reusar FriendForm e TemperatureBadge; criar InteractionForm rapido e InteractionTimeline
+
+Data: 2026-04-18
 Iteracao: Frontend base + dashboard (13.14 + 13.15)
 Resumo: primeira UI funcional. DashboardPage consome `/api/dashboard/summary` e `/clusters` em paralelo e renderiza 4 cards de resumo, bloco de atencao imediata, lista por temperatura e grade de clusters. Tipos TS completos espelhando os schemas Pydantic. Build (`tsc -b && vite build`) limpo.
 Decisoes:

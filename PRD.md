@@ -732,22 +732,22 @@ Feito: Sim
 ### 13.16 Frontend contatos
 
 Atividade: criar `FriendsPage`
-Feito: Nao
+Feito: Sim
 
 Atividade: criar lista de cards de amigos
-Feito: Nao
+Feito: Sim
 
 Atividade: criar filtros por categoria
-Feito: Nao
+Feito: Sim
 
 Atividade: criar filtros por tag
-Feito: Nao
+Feito: Sim
 
 Atividade: criar modal ou formulario de novo contato
-Feito: Nao
+Feito: Sim
 
 Atividade: criar fluxo de edicao de contato
-Feito: Nao
+Feito: Sim
 
 ### 13.17 Frontend detalhe do contato
 
