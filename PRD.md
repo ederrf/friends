@@ -641,16 +641,16 @@ Feito: Sim
 ### 13.11 Importacao VCF
 
 Atividade: implementar parser basico de VCF
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar preview de importacao de VCF
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar confirmacao de importacao de VCF
-Feito: Nao
+Feito: Sim
 
 Atividade: cobrir parser de VCF com testes
-Feito: Nao
+Feito: Sim
 
 ### 13.12 Integracao Evernote via IFTTT
 

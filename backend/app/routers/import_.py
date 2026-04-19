@@ -4,8 +4,9 @@ Endpoints aceitam upload `multipart/form-data` para nao precisar
 serializar o conteudo do arquivo em base64. O `payload` JSON do commit
 vem como `Form(...)` ao lado do arquivo.
 
-VCF (13.11) ainda nao foi implementado — sera adicionado na proxima
-iteracao usando a mesma estrutura.
+Ambos os formatos (CSV 13.10 e VCF 13.11) compartilham o mesmo schema
+`ImportPreview`/`ImportCommit`/`ImportCommitResponse`. VCF ignora o
+campo `mapping` (os nomes de propriedade do vCard ja sao canonicos).
 """
 
 from __future__ import annotations
@@ -92,12 +93,44 @@ async def csv_commit(
     aceita JSON direto em campos nao-arquivo).
     """
     text = await _read_text(file)
+    commit = _parse_commit_payload(payload)
+    return await import_service.commit_csv(session, text, commit)
+
+
+# ── VCF ──────────────────────────────────────────────────────────
+
+
+@router.post("/vcf/preview", response_model=ImportPreview)
+async def vcf_preview(file: UploadFile = File(...)) -> ImportPreview:
+    """Le o VCF e devolve preview (sem persistir).
+
+    Nao ha `mapping` para VCF — as propriedades do vCard (FN, TEL, ...)
+    mapeiam diretamente para campos canonicos. `detected_fields` e
+    `suggested_mapping` voltam vazios.
+    """
+    text = await _read_text(file)
+    return import_service.preview_vcf(text)
+
+
+@router.post("/vcf/commit", response_model=ImportCommitResponse)
+async def vcf_commit(
+    file: UploadFile = File(...),
+    payload: str = Form(...),
+    session: AsyncSession = Depends(get_db),
+) -> ImportCommitResponse:
+    """Persiste os contatos VCF selecionados."""
+    text = await _read_text(file)
+    commit = _parse_commit_payload(payload)
+    return await import_service.commit_vcf(session, text, commit)
+
+
+def _parse_commit_payload(raw: str) -> ImportCommit:
+    """Valida e devolve `ImportCommit` a partir da string JSON do form."""
     try:
-        commit = ImportCommit.model_validate_json(payload)
+        return ImportCommit.model_validate_json(raw)
     except ValueError as exc:
         raise AppError(
             code="IMPORT_BAD_PAYLOAD",
             message="Payload de confirmacao invalido.",
             details={"reason": str(exc)},
         ) from exc
-    return await import_service.commit_csv(session, text, commit)

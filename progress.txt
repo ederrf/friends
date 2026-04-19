@@ -25,6 +25,34 @@ Proximo passo sugerido:
 - item
 
 Data: 2026-04-19
+Iteracao: Importacao VCF no backend (13.11)
+Resumo: parser vCard (2.1/3.0) reusando schema de import do CSV, endpoints `/api/import/vcf/preview` e `/api/import/vcf/commit`, 21 testes novos. Total: 137 testes verdes.
+Decisoes:
+- parser puro em `import_service.parse_vcf(text)` devolve lista de `ImportCandidate` — mesmo schema do CSV permite o frontend unificar a UI de preview
+- fallback de nome: `FN` preferido, senao monta a partir de `N:Family;Given;Additional;...` com ordem "Given [Additional] Family"
+- line-folding RFC 6350 (§3.2): linhas comecando com espaco/tab se juntam a anterior; aplicado antes do parse de propriedades
+- escape RFC 6350 (§3.4): `\n` -> newline, `\,` -> virgula, `\;` -> ponto e virgula, `\\` -> barra
+- quoted-printable suportado via stdlib `quopri` quando `ENCODING=QUOTED-PRINTABLE` (exports Outlook vCard 2.1 com acentos)
+- parametros de propriedade (`TEL;TYPE=CELL:...`, `TEL;CELL:...` estilo 2.1) parseados mas so `TYPE/CHARSET/ENCODING` sao usados; para phone/email/bday pegamos o PRIMEIRO valor nao vazio (heuristica pragmatica, evita explodir preview com 5 telefones por contato)
+- `CATEGORIES` -> `tags`, deduplicado e lowercase (reusando `_split_tags` do CSV que ja aceita virgula/ponto-virgula/pipe)
+- `BDAY:--MM-DD` (ano ausente) retorna `None` em vez de falhar — Friend.birthday e nullable
+- VCF nao tem mapping (nomes de propriedade sao canonicos), entao `detected_fields` e `suggested_mapping` voltam vazios no preview — frontend pode pular a etapa de mapeamento
+- helper privado `_persist_approved` extraido para eliminar duplicacao entre `commit_csv` e `commit_vcf`; muda so o rotulo de erro ("linha" vs "contato")
+- CRLF/CR/LF normalizados no unfold; limite de 10 MB por arquivo ja coberto pelo router CSV reusado
+Arquivos alterados:
+- backend/app/services/import_service.py (parse_vcf + unfold + escapes + quoted-printable + _persist_approved helper extraido)
+- backend/app/routers/import_.py (2 endpoints VCF + helper `_parse_commit_payload` deduplicado)
+- backend/tests/test_import_vcf.py (novo: 21 testes)
+- PRD.md (13.11 marcado como Sim)
+- progress.txt (esta entrada)
+Pendencias:
+- 13.19 Frontend de importacao (modal com upload → mapping CSV → preview → commit) pode ser implementado agora
+- 13.12 Evernote via IFTTT e 13.13 Google Calendar sao integracoes externas independentes
+Proximo passo sugerido:
+- 13.19 Frontend de importacao (fecha o loop de UX pro usuario final)
+- depois 13.12 IFTTT (curto, so cliente HTTP + endpoint) e 13.13 Calendar
+
+Data: 2026-04-19
 Iteracao: Importacao CSV no backend (13.10)
 Resumo: parser CSV em servico dedicado com autodeteccao de colunas (heuristica para Google Contacts/Outlook em pt-BR e en), endpoints `/api/import/csv/preview` e `/api/import/csv/commit` via multipart, e suite com 41 testes (parser puro + integracao). Total: 116 testes verdes.
 Decisoes:
