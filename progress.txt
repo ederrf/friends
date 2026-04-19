@@ -25,6 +25,27 @@ Proximo passo sugerido:
 - item
 
 Data: 2026-04-19
+Iteracao: Frontend interesses (13.18)
+Resumo: InterestsPage com 3 secoes — lista global de tags com contagem (chips), grid de clusters compartilhados (>=2 amigos) reusando ClusterCard, e bloco ambar de interesses unicos (friend_count=1). Header mostra contagem agregada e botao Atualizar que recarrega ambos os fetches. Build limpo (68 modulos, 85 KB gzip).
+Decisoes:
+- 2 fetches paralelos: `/interests` ja inclui solos com contagem, mas `/dashboard/clusters` traz amigos por tag — manter separados evita refetch ao recarregar so um lado
+- "interesses unicos" derivados client-side via `useMemo` filtrando `friend_count === 1` em vez de chamar endpoint extra
+- chips de tag linkam para `/friends?tag=<encoded>` (rota ja aceita o parametro via FriendsPage filters; wiring de URL search params pode vir depois sem quebrar nada)
+- ordenacao da lista vem do backend (count DESC, tag ASC) — nao reordeno no front
+- chips unicos em ambar para distinguir visualmente das tags compartilhadas (slate)
+- estado vazio especifico para cada secao (nenhuma tag, sem clusters, "tudo compartilhado")
+Arquivos alterados:
+- frontend/src/pages/InterestsPage.tsx (reescrita completa: 3 secoes vs placeholder anterior)
+- PRD.md (13.18 marcado como Sim)
+- progress.txt (esta entrada)
+Pendencias:
+- FriendsPage ainda nao consome `?tag=` da URL — links funcionam mas filtro nao auto-aplica; resolver junto com proxima visita ao FriendsPage
+- bloco de clusters poderia ter filtro/busca quando o numero crescer (>30 clusters); deixar para iteracao de polimento
+Proximo passo sugerido:
+- 13.19 Frontend importacao depende de 13.10/13.11 (CSV/VCF backend); voltar para backend antes
+- alternativa: 13.20 (testes de import) tambem precisa do backend feito
+
+Data: 2026-04-19
 Iteracao: Frontend detalhe do contato (13.17)
 Resumo: FriendDetailPage compoe header, edicao via modal, exclusao, gestao individual de tags, form rapido de interacao, timeline e ganchos de conversa. 5 componentes novos. Build limpo (68 modulos, 85 KB gzip).
 Decisoes:

@@ -775,16 +775,16 @@ Feito: Sim
 ### 13.18 Frontend interesses
 
 Atividade: criar `InterestsPage`
-Feito: Nao
+Feito: Sim
 
 Atividade: criar lista de interesses com contagem
-Feito: Nao
+Feito: Sim
 
 Atividade: criar lista de clusters por interesse
-Feito: Nao
+Feito: Sim
 
 Atividade: criar bloco de interesses unicos
-Feito: Nao
+Feito: Sim
 
 ### 13.19 Frontend importacao
 
