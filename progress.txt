@@ -25,6 +25,284 @@ Proximo passo sugerido:
 - item
 
 Data: 2026-04-18
+Iteracao: Frontend base + dashboard (13.14 + 13.15)
+Resumo: primeira UI funcional. DashboardPage consome `/api/dashboard/summary` e `/clusters` em paralelo e renderiza 4 cards de resumo, bloco de atencao imediata, lista por temperatura e grade de clusters. Tipos TS completos espelhando os schemas Pydantic. Build (`tsc -b && vite build`) limpo.
+Decisoes:
+- 13.14 estava 100% feito desde 13.1 — apenas reconciliei o PRD marcando os itens como feitos em vez de refazer
+- services quebrados por recurso (`dashboardApi`, `friendsApi`, `interactionsApi`, `interestsApi`) em cima do `api.ts` generico, mantendo o contrato tipado sem acoplar cada pagina ao fetch cru
+- `useFetch` minimo (`data | error | loading | reload`) em vez de React Query/SWR; shape pensado para trocar a implementacao depois sem quebrar as paginas
+- componentes reutilizaveis criados agora porque sao necessarios em varias paginas: `TemperatureBadge`, `SummaryCard`, `FriendRow`, `ClusterCard`, `Loader`, `ErrorBanner`
+- `TemperatureBadge` mapeia os 4 rotulos do PRD 7.3 (Quente/Morna/Esfriando/Fria) para cores Tailwind distintas para leitura rapida
+- `FriendRow` ja esta preparado para `highlightOverdue` para que a mesma linha sirva em dashboard e na FriendsPage (13.16)
+- dois fetches independentes no dashboard (summary + clusters) — nao faz sentido forçar 1 endpoint unificado porque clusters tem shape diferente e custo diferente
+- top 10 por temperatura na home para nao scrollar infinito; a FriendsPage (13.16) vai mostrar lista completa com filtros
+- sem dependencia adicional: React 19 + RR 7 + Tailwind 4 + react-hot-toast ja no package.json cobrem o necessario
+Arquivos alterados:
+- frontend/src/types/index.ts (tipos completos: Friend, Interaction, Tag, DashboardSummary, etc.)
+- frontend/src/services/dashboardApi.ts (novo)
+- frontend/src/services/friendsApi.ts (novo)
+- frontend/src/services/interactionsApi.ts (novo)
+- frontend/src/services/interestsApi.ts (novo)
+- frontend/src/hooks/useFetch.ts (novo)
+- frontend/src/components/TemperatureBadge.tsx (novo)
+- frontend/src/components/SummaryCard.tsx (novo)
+- frontend/src/components/FriendRow.tsx (novo)
+- frontend/src/components/ClusterCard.tsx (novo)
+- frontend/src/components/Loader.tsx (novo)
+- frontend/src/components/ErrorBanner.tsx (novo)
+- frontend/src/pages/DashboardPage.tsx (reescrito)
+- PRD.md (13.14 e 13.15 marcados como feitos)
+Pendencias:
+- FriendsPage (13.16): lista + filtros + acao de novo contato
+- FriendDetailPage (13.17): notas + tags + interacoes + ganchos de conversa
+- InterestsPage (13.18): lista de interesses + clusters + unicos
+- importacao CSV/VCF (13.10 e 13.11 backend; 13.19 frontend)
+- integracoes externas (13.12 Evernote, 13.13 Calendar)
+Proximo passo sugerido:
+- 13.16 (Frontend contatos): primeiro CRUD visual — lista, filtros, formulario de novo amigo
+- preparar um form reusavel (FriendForm) que sirva tanto no novo quanto na edicao em 13.17
+
+Data: 2026-04-18
+Iteracao: API de interesses e tags (13.9)
+Resumo: `GET /api/interests` com contagem por tag, `POST /api/friends/{id}/tags` e `DELETE /api/friends/{id}/tags/{tag}`. Normalizacao consistente com o CRUD de amigos. 75 testes passando (+13 novos).
+Decisoes:
+- `/api/interests` inclui tags solo (`friend_count=1`); `/api/dashboard/clusters` continua com `min_cluster_size=2` — sao visoes complementares
+- agregacao via `COUNT(DISTINCT friend_id)` e ordenacao `(count DESC, tag ASC)` no SQL, executada no SQLAlchemy (mais barato que carregar todas as tags em memoria)
+- adicionar tag duplicada (normalizada) devolve `409 TAG_ALREADY_EXISTS` com detalhes `{friend_id, tag}`, em vez de deixar a unique constraint disparar `IntegrityError` generico
+- remover tag inexistente devolve `404 TAG_NOT_FOUND` em vez de silencioso — evita UX ruim de clique duplo parecer funcionar
+- DELETE normaliza o path param (`CINEMA` -> `cinema`) — a URL e idempotente em relacao a caixa
+- `add_tag_to_friend` reusa `friend_service._normalize_tag` para manter o mesmo pipeline do CRUD de amigos
+- endpoints devolvem `FriendRead` completo (com metricas rehidratadas) para a UI nao precisar refetch separado apos mutacao
+- organizei os dois scopes em um mesmo modulo `routers/interests.py` exportando `interests_router` e `tags_router`; `tags_router` tem prefix aninhado `/api/friends/{friend_id}/tags` (coerente com 13.7)
+Arquivos alterados:
+- backend/app/services/tag_service.py (novo)
+- backend/app/routers/interests.py (novo, 2 routers)
+- backend/app/routers/__init__.py (exports)
+- backend/app/main.py (include dos 2 routers)
+- backend/tests/test_interests_api.py (novo, 13 testes)
+- PRD.md (13.9 marcado como feito)
+Pendencias:
+- importacao CSV (13.10) e VCF (13.11)
+- IFTTT Evernote (13.12)
+- Google Calendar (13.13)
+- frontend: 13.14 (reconciliar o que ja foi feito no 13.1) + 13.15 (dashboard) destravam feedback visual
+Proximo passo sugerido:
+- opcao A (PRD estrito): seguir para 13.10 (importacao CSV)
+- opcao B (UI viva antes): pular para 13.14 + 13.15 usando as APIs ja prontas
+
+Data: 2026-04-18
+Iteracao: API de dashboard (13.8)
+Resumo: tres endpoints agregadores em `/api/dashboard`: `summary` (totais, media de temperatura, listas auxiliares), `overdue` (amigos com `next_ping < 0`) e `clusters` (amigos por interesse compartilhado). Agregacao em memoria sobre `friend_service.to_read` + `friendship`. 62 testes passando (+9 novos).
+Decisoes:
+- agregacao e feita em memoria (carrega todos os amigos com `selectinload(tags)` uma vez e hidrata via `to_read`) porque o app e single-user com volume pequeno; migrar para queries agregadas no SQL se algum dia escalar — contrato da API nao muda
+- `summary.total_interests` conta tags unicas normalizadas (ja lowercase no banco via `_normalize_tag`), entao `RPG` e `rpg` contam como 1
+- `summary.overdue_count` e `overdue_friends` sao derivados em memoria com `is_overdue` para ficar consistente com `/overdue`
+- `overdue_friends` e `/overdue` ordenam por `days_until_next_ping ASC` (mais atrasado primeiro) com desempate alfabetico
+- `friends_by_temperature` ordena temperatura DESC, desempate alfabetico — estabilidade da UI
+- `clusters` reusa `friendship.cluster_by_interest(min_cluster_size=2)`; tags com 1 amigo nao viram cluster (ficam para `GET /api/interests` em 13.9)
+- ordem dos clusters: tamanho DESC, desempate alfabetico pela tag
+- reusei `friend_service.to_read` em vez de recalcular metricas, evitando dois caminhos divergentes de hidratacao
+Arquivos alterados:
+- backend/app/services/dashboard_service.py (novo)
+- backend/app/routers/dashboard.py (novo)
+- backend/app/routers/__init__.py (export do dashboard_router)
+- backend/app/main.py (include_router do dashboard_router)
+- backend/tests/test_dashboard_api.py (novo, 9 testes)
+- PRD.md (13.8 marcado como feito)
+Pendencias:
+- API de interesses (13.9): `GET /api/interests` com contagem e `POST`/`DELETE` em `/api/friends/{id}/tags`
+- importacao CSV (13.10) e VCF (13.11)
+- IFTTT Evernote (13.12) e Google Calendar (13.13)
+- frontend chapters 13.14-13.19 (dashboard ja tem API pronta para consumir)
+Proximo passo sugerido:
+- seguir para 13.9 (API de interesses): listar com contagem (inclusive tags "solo"), adicionar e remover tag de um amigo
+- reaproveitar `_unique_tags` do `friend_service` para garantir normalizacao consistente
+
+Data: 2026-04-18
+Iteracao: API de interacoes (13.7)
+Resumo: endpoints `POST` e `GET` em `/api/friends/{friend_id}/interactions` implementados. Ao registrar uma interacao, o servico atualiza `friend.last_contact_at` somente se a nova `occurred_at` for mais recente que o valor atual. 53 testes passando (27 dominio + 15 amigos + 11 interacoes).
+Decisoes:
+- rotas aninhadas ao amigo (`/api/friends/{id}/interactions`) tornam o escopo explicito e dispensam filtro por amigo no nivel global
+- `last_contact_at` so avanca: interacao historica (occurred_at no passado) nao rebaixa o contato mais recente ja registrado — protege contra import de historico sobrescrever um ping recente
+- `occurred_at` ausente no payload vira `datetime.now(ZoneInfo(settings.timezone))` no servico (registro rapido em um toque)
+- datetimes naive vindos do SQLite sao tratados como timezone do app antes de comparar com `occurred_at` tz-aware, reusando o mesmo padrao de `friendship._aware`
+- validacao de existencia do amigo usa `session.get(Friend, id)` antes de inserir/listar, devolvendo `FRIEND_NOT_FOUND` no formato padrao (mesmo path de erro do 13.6)
+- listagem ordena por `occurred_at DESC, id DESC` — id desempata quando varias interacoes no mesmo timestamp (caso de import em lote)
+- tipo invalido e nota > 2000 chars viram `VALIDATION_ERROR` automaticamente pelos schemas Pydantic existentes (nada a mudar em 13.4)
+- deletar amigo ja apaga interacoes em cascata (FK com `ondelete=CASCADE` do 13.3) — coberto por teste
+Arquivos alterados:
+- backend/app/services/interaction_service.py (novo)
+- backend/app/routers/interactions.py (novo)
+- backend/app/routers/__init__.py (export do interactions_router)
+- backend/app/main.py (include_router do interactions_router)
+- backend/tests/test_interactions_api.py (novo, 11 testes)
+- PRD.md (13.7 e "testar registro de interacao" em 13.20 marcados como feitos)
+Pendencias:
+- dashboard (`/api/dashboard/summary`, `/overdue`, `/next`) consumindo `friendship.compute_friend_metrics` (13.8)
+- tags/interesses com clusters e hooks (13.9)
+- importacao CSV/VCF (13.10, 13.11)
+- IFTTT Evernote (13.12) consumira `create_interaction` como gatilho de append
+- Google Calendar (13.13) vai reagendar `last_contact_at + cadencia` apos nova interacao
+Proximo passo sugerido:
+- seguir para 13.8 (API de dashboard): summary (contagens por categoria/cadencia + temperatura media), overdue (next_ping < 0) e next (proximos pings), tudo derivado de `compute_friend_metrics`
+- manter o padrao de testes integrados (conftest + AsyncClient) ja estabelecido
+
+Data: 2026-04-18
+Iteracao: API CRUD de amigos (13.6)
+Resumo: router `/api/friends` implementado com GET/POST/PATCH/DELETE e filtros opcionais (category, cadence, tag). Servico `friend_service` hidrata `FriendRead` com as metricas de `friendship`. Formato de erro padrao (secao 9.7 do PRD) implementado em `app/errors.py` com handlers globais. 42 testes passando (27 de dominio + 15 de integracao de API).
+Decisoes:
+- criado modulo `app/errors.py` com `AppError`, `NotFoundError`, `ConflictError`, `ExternalServiceError` e handlers que serializam no formato `{"error": {"code","message","details"}}` (inclui `RequestValidationError` -> code `VALIDATION_ERROR` com status 400 e `HTTPException` -> code generico)
+- tags sao normalizadas (`strip().lower()`) e deduplicadas preservando ordem no `friend_service._unique_tags`; filtro por tag aceita qualquer caixa
+- `selectinload(Friend.tags)` usado em todas as queries para evitar `MissingGreenlet` em contexto async
+- apos `create_friend`/`update_friend`, em vez de `session.refresh(..., attribute_names=["tags"])` (que disparava lazy load e quebrava em async), re-seleciona o amigo com `get_friend(session, id)` para devolver o objeto ja hidratado
+- `PATCH` usa `payload.model_dump(exclude_unset=True)` para atualizacao parcial real (nao zera campos nao enviados)
+- listagem sempre ordenada por `name` para previsibilidade da UI
+- dependencia `pydantic` promovida para `pydantic[email]` no `pyproject.toml` pois `EmailStr` exige `email-validator`
+- fixtures de teste usam arquivo SQLite em `tmp_path` (nao `:memory:`) porque conexoes diferentes do pool precisam enxergar as mesmas tabelas
+- `conftest.py` faz override de `get_db` com `async_sessionmaker(expire_on_commit=False)` e commita ao final de cada request para que leituras subsequentes no mesmo teste vejam os dados
+Arquivos alterados:
+- backend/app/errors.py (novo)
+- backend/app/services/friend_service.py (novo)
+- backend/app/routers/friends.py (novo)
+- backend/app/routers/__init__.py (export do friends_router)
+- backend/app/main.py (register_error_handlers + include_router)
+- backend/pyproject.toml (pydantic -> pydantic[email])
+- backend/tests/conftest.py (engine/session_factory/client/friend_payload)
+- backend/tests/test_friends_api.py (novo, 15 testes)
+- PRD.md (13.6 e partes de 13.20 marcados como feitos)
+Pendencias:
+- implementar router de interacoes (13.7) atualizando `last_contact_at` automaticamente
+- implementar routers de dashboard (13.8) consumindo `friendship.compute_friend_metrics`
+- implementar router de tags/interesses (13.9) com clusters e ganchos de conversa
+- importacao CSV/VCF (13.10 e 13.11)
+- integracao IFTTT Evernote (13.12) e Google Calendar (13.13)
+Proximo passo sugerido:
+- seguir para 13.7 (API de interacoes): POST/GET em `/api/friends/{friend_id}/interactions`, setando `friend.last_contact_at = max(atual, occurred_at)` na criacao
+- reusar fixtures existentes em `conftest.py` e o padrao de testes do `test_friends_api.py`
+
+Data: 2026-04-18
+Iteracao: schemas e regras de dominio (13.4 + 13.5)
+Resumo: schemas Pydantic criados para Friend, Tag, Interaction, Dashboard e Import. Servico de dominio puro implementado com temperatura, dias sem contato, proximo ping, clusters e ganchos de conversa. 27 testes unitarios passando.
+Decisoes:
+- schemas de Friend incluem campos derivados (temperature, temperature_label, days_since_last_contact, days_until_next_ping) calculados em tempo de resposta, nao persistidos
+- tags viajam como `list[str]` em `FriendCreate`/`FriendRead` para simplificar a UI; a tabela `friend_tag` continua normalizada internamente
+- `InteractionCreate.occurred_at` e opcional; o servico usa now() quando ausente para registro rapido
+- servico `friendship` exposto como funcoes puras (sem DB) para testabilidade; recebe dados agregados e devolve metricas
+- `cluster_by_interest` ignora tags com apenas 1 amigo por padrao (nao e cluster)
+- `conversation_hooks` ordena por frequencia compartilhada decrescente (tags mais populares viram pontes sociais mais fortes)
+- defesa contra datetime naive no SQLite e contra contato com timestamp futuro (clock drift)
+- teste paramétrico `test_cadence_days_cobre_todos_os_membros_do_enum` protege contra adicao de nova cadencia sem atualizar o mapa
+Arquivos alterados:
+- backend/app/schemas/friend.py (novo)
+- backend/app/schemas/tag.py (novo)
+- backend/app/schemas/interaction.py (novo)
+- backend/app/schemas/dashboard.py (novo)
+- backend/app/schemas/import_.py (novo)
+- backend/app/schemas/__init__.py (exports)
+- backend/app/services/friendship.py (novo)
+- backend/app/services/__init__.py (exports)
+- backend/tests/test_friendship.py (novo, 27 testes)
+- PRD.md (13.4, 13.5 e partes de 13.20 marcados como feitos)
+Pendencias:
+- implementar routers CRUD de amigos (13.6)
+- implementar router de interacoes (13.7)
+- implementar routers de dashboard (13.8) consumindo o servico friendship
+- implementar router de tags/interesses (13.9)
+Proximo passo sugerido:
+- seguir para 13.6 (API de amigos) usando os schemas e o servico ja prontos
+- adicionar dependencia de sessao async do SQLAlchemy nos routers via `Depends(get_db)`
+
+Data: 2026-04-18
+Iteracao: banco e migrations (13.3)
+Resumo: modelos ORM criados para as 5 entidades e migration inicial gerada e aplicada em SQLite com sucesso. Enums agora persistem valores lowercase alinhados ao PRD.
+Decisoes:
+- usar `values_callable=lambda e: [m.value for m in e]` em todos os `SAEnum` para persistir valores lowercase (ex: `rekindle`, `monthly`, `in_person`) em vez dos nomes uppercase
+- remover `Base.metadata.create_all` do lifespan do FastAPI; Alembic passa a ser a fonte unica de verdade do schema
+- adicionar index composto `ix_interaction_friend_occurred (friend_id, occurred_at)` para acelerar timeline
+- adicionar unique constraints `uq_friend_tag_friend_tag (friend_id, tag)` e `uq_calendar_link_friend_provider (friend_id, provider)`
+- todos os ondelete=CASCADE a partir de `friend` (tags, interacoes, calendar_links) para limpeza consistente
+- tipo de interacao (`InteractionType`) definido com 5 valores: message, call, in_person, email, other
+Arquivos alterados:
+- backend/app/main.py (remocao de create_all)
+- backend/app/models/friend.py (novo)
+- backend/app/models/friend_tag.py (novo)
+- backend/app/models/interaction.py (novo)
+- backend/app/models/sync_event.py (novo)
+- backend/app/models/calendar_link.py (novo)
+- backend/app/models/__init__.py (exports)
+- backend/alembic/versions/85924c308070_initial_schema.py (nova migration)
+- PRD.md (13.3 marcado como feito)
+Pendencias:
+- escrever schemas Pydantic (13.4)
+- implementar servico de dominio com temperatura, dias sem contato, proximo ping (13.5)
+- iniciar API CRUD de amigos (13.6)
+Proximo passo sugerido:
+- seguir para 13.4 (schemas Pydantic) e 13.5 (servico de dominio) em paralelo
+- esses dois destravam o 13.6 (API de amigos)
+
+Data: 2026-04-18
+Iteracao: setup do repositorio (13.1 e 13.2)
+Resumo: estrutura real do projeto criada com frontend Vite/React/TS e backend FastAPI/SQLAlchemy async/Alembic, espelhando o padrao de `/Users/eder/Projects/money`. Prototipo legado arquivado em `legacy/`.
+Decisoes:
+- projeto vive em `/Users/eder/Documents/Projetos/friends` (nao em `~/Projects`)
+- SQLite unico suportado na v1 (o projeto `money` mantinha dual com Postgres; Friends descarta asyncpg)
+- frontend comeca com React Router, Tailwind v4 e react-hot-toast; sem recharts/katex por enquanto
+- `GOOGLE_TOKEN_PATH` padrao aponta para `~/.friends/google_token.json` (fora do repo, listado no `.gitignore`)
+- `legacy/friends-dashboard.jsx` continua como referencia ate o porting do 13.1 ser concluido
+Arquivos alterados:
+- Makefile (novo)
+- .env.example (novo)
+- .gitignore (novo)
+- backend/pyproject.toml (novo)
+- backend/app/{__init__,config,database,main}.py (novos)
+- backend/app/{models,schemas,routers,services,tasks}/__init__.py (novos)
+- backend/alembic.ini, backend/alembic/{env.py,script.py.mako,README,versions/.gitkeep} (novos)
+- backend/tests/{__init__.py,conftest.py} (novos)
+- frontend/package.json, vite.config.ts, tsconfig*.json, index.html (novos)
+- frontend/src/{main.tsx,App.tsx,index.css} (novos)
+- frontend/src/pages/{Dashboard,Friends,FriendDetail,Interests}Page.tsx (stubs)
+- frontend/src/services/api.ts, frontend/src/types/index.ts (novos)
+- frontend/src/{components,hooks}/.gitkeep (novos)
+- legacy/README.md (novo)
+- legacy/friends-dashboard.jsx (movido de ./)
+- PRD.md (atividades 13.1 e 13.2 marcadas como feitas)
+Pendencias:
+- rodar `make install` e validar que backend e frontend sobem (`make dev`)
+- portar utilitarios uteis de `legacy/friends-dashboard.jsx` (parsers CSV/VCF, tags sugeridas, paleta)
+- criar applet IFTTT e preencher `IFTTT_WEBHOOK_KEY` no `.env`
+- criar credenciais OAuth do Google Calendar e preencher `GOOGLE_CLIENT_ID`/`SECRET`
+- iniciar 13.3 (modelos ORM e primeira migration)
+Proximo passo sugerido:
+- validar setup com `make install && make dev`
+- seguir para 13.3: modelar `Friend`, `FriendTag`, `Interaction`, `SyncEvent`, `CalendarLink` e gerar migration inicial
+
+Data: 2026-04-18
+Iteracao: revisao de decisoes de integracao
+Resumo: revisao geral do PRD com ajuste das integracoes externas, autenticacao, casos de borda e formato de API. Evernote passa a ser via IFTTT em vez de API nativa.
+Decisoes:
+- Evernote sera integrado via webhook do IFTTT, sem OAuth nem SDK oficial
+- convencao de titulo da nota do Evernote: `Friends: {nome}`
+- integracao com Evernote e one-way (so escrita); campo `evernote_note_id` removido do modelo
+- Google Calendar usa API oficial com OAuth 2.0
+- credenciais OAuth (client_id/secret) ficam em `.env`; refresh tokens em arquivo local fora do repo
+- Google Calendar cria um evento por contato (decisao da secao 12 fechada)
+- temperatura com `last_contact_at` nulo usa `created_at` como fallback, default 100 se ambos nulos
+- calculo de temperatura usa timezone fixo `America/Sao_Paulo`
+- formato de erro padrao de API adicionado (secao 9.7)
+- secao 13.1 ganhou atividade de portar parsers e utilitarios do `friends-dashboard.jsx`
+- atividades 13.12 reduzidas de 8 para 5 por simplificacao via IFTTT
+Arquivos alterados:
+- PRD.md
+- progress.txt
+Pendencias:
+- criar applet IFTTT `Webhooks -> Evernote Append to note` e capturar `IFTTT_WEBHOOK_KEY`
+- criar projeto no Google Cloud e obter `CLIENT_ID` e `CLIENT_SECRET` do Google Calendar
+- estruturar o repositorio real com `frontend/` e `backend/`
+Proximo passo sugerido:
+- iniciar 13.1 (estrutura de repositorio e porting do prototipo legado)
+- em paralelo, configurar o applet IFTTT para destravar 13.12
+
+Data: 2026-04-18
 Iteracao: renomeacao de arquivo legado
 Resumo: o arquivo legado do prototipo visual foi renomeado para refletir o nome oficial do app.
 Decisoes:

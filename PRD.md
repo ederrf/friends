@@ -64,12 +64,13 @@ As decisoes abaixo ja estao fechadas e nao entram como atividades pendentes:
 - o nome oficial do app e `Friends`
 - o projeto e para uso pessoal, nao para venda
 - Todoist saiu do escopo
-- Evernote e obrigatorio no escopo
-- Google Calendar continua no escopo
+- Evernote e obrigatorio no escopo, mas via IFTTT (nao via API nativa)
+- Google Calendar continua no escopo via API oficial
 - o MVP sera local-first
 - a fonte principal de verdade dos dados sera o proprio Friends
-- o Evernote sera inicialmente um destino sincronizado para notas e historico
+- o Evernote sera inicialmente um destino one-way de append de historico
 - nao vamos perseguir sync bidirecional completo com Evernote no inicio
+- integracao com Google Calendar sera um evento por contato, nao rotina central
 
 ## 4. Objetivo do produto
 
@@ -198,12 +199,19 @@ Faixas:
 - 25 a 49: Esfriando
 - 0 a 24: Fria
 
+Casos de borda:
+
+- se `last_contact_at` for nulo (amigo recem-criado), usar `created_at` como referencia para `dias_sem_contato`
+- se `created_at` tambem nao estiver disponivel, tratar temperatura como 100 (neutro, sem alarme)
+- calculo deve usar timezone fixo `America/Sao_Paulo` para evitar oscilacao na fronteira do dia
+
 ### 7.4 Papel do Evernote
 
-- manter uma nota por amigo
-- registrar metadados relevantes do contato
-- manter uma secao de notas livres
+- manter uma nota por amigo, identificada pela convencao de titulo `Friends: {nome}`
 - appendar entradas de historico sempre que houver nova interacao no Friends
+- integracao feita via webhook do IFTTT, sem uso direto da API do Evernote
+- o Friends nao le notas do Evernote; a integracao e one-way (so escrita)
+- se a primeira nota de um amigo for criada pelo IFTTT, o bloco de metadados vai na primeira entrada; atualizacoes de metadados depois nao se refletem retroativamente
 
 ### 7.5 Papel do Google Calendar
 
@@ -225,10 +233,11 @@ Campos previstos:
 - `category`
 - `cadence`
 - `notes`
-- `last_contact_at`
-- `evernote_note_id`
+- `last_contact_at` (nullable; amigos recem-criados podem nao ter contato registrado)
 - `created_at`
 - `updated_at`
+
+Observacao: nao ha campo `evernote_note_id` porque a integracao via IFTTT nao retorna id da nota. A nota e identificada pela convencao de titulo.
 
 ### 8.2 Tabela `friend_tags`
 
@@ -314,9 +323,31 @@ Campos previstos:
 
 ### 9.6 Integracoes
 
-- `POST /api/integrations/evernote/friends/{friend_id}/sync`
+- `POST /api/integrations/evernote/friends/{friend_id}/sync` (dispara webhook IFTTT)
 - `POST /api/integrations/calendar/friends/{friend_id}/sync`
-- `POST /api/integrations/calendar/review-sync`
+
+### 9.7 Formato de erro padrao
+
+Toda resposta de erro deve seguir o formato:
+
+```json
+{
+  "error": {
+    "code": "STRING_CODE",
+    "message": "mensagem legivel",
+    "details": {}
+  }
+}
+```
+
+Codigos HTTP esperados:
+
+- `400` validacao de payload
+- `404` entidade nao encontrada
+- `409` conflito (ex: tag duplicada)
+- `422` payload valido mas regra de negocio falhou
+- `502` falha em integracao externa (IFTTT, Google Calendar)
+- `500` erro interno nao esperado
 
 ## 10. Telas do frontend
 
@@ -362,205 +393,233 @@ Deve exibir:
 - clusters de amigos por interesse
 - interesses unicos
 
-## 11. Integracao com Evernote
+## 11. Integracao com Evernote (via IFTTT)
 
-Estrategia inicial:
+A integracao com Evernote sera feita via webhook do IFTTT. O Friends nao fala com a API do Evernote diretamente, o que elimina a necessidade de OAuth, tokens de refresh e biblioteca oficial.
 
-- o backend cria ou localiza uma nota do Evernote para cada amigo
-- a nota deve conter um bloco de metadados do contato
-- a nota deve conter uma secao `Notas`
-- a nota deve conter uma secao `Historico`
-- ao registrar uma nova interacao, o backend deve appendar a nova entrada na secao `Historico`
-- falhas na sync devem gerar registro em `sync_events`
-- falhas na sync nao podem impedir gravacao local da interacao
+Estrategia:
 
-Formato minimo desejado da nota:
+- o usuario configura um applet IFTTT do tipo `Webhooks (Receive a web request) -> Evernote (Append to note)`
+- o applet deve usar o evento `friends_log` (nome sugerido, configuravel)
+- o applet usa `{{Value1}}` como titulo da nota e `{{Value2}}` como corpo a ser appendado
+- o backend dispara POST para `https://maker.ifttt.com/trigger/{event}/with/key/{IFTTT_WEBHOOK_KEY}` com `value1`, `value2` e opcionalmente `value3`
+- convencao de titulo de nota: `Friends: {nome do amigo}`
+- falhas de webhook devem gerar registro em `sync_events`
+- falhas nao podem impedir gravacao local da interacao
+
+Limitacoes aceitas:
+
+- integracao e one-way (so escrita); o Friends nao le nem busca notas do Evernote
+- nao ha captura de id da nota; a nota e identificada pela convencao de titulo
+- metadados de cabecalho (telefone, aniversario, tags) entram so na primeira entrada, nao sao atualizados retroativamente
+- IFTTT limita a 3 valores por trigger (value1, value2, value3)
+- upgrade para API nativa do Evernote fica como fase 2 opcional, caso IFTTT vire limitacao
+
+Formato minimo de cada append (corpo enviado em `value2`):
 
 ```text
-# Nome do amigo
-Telefone | Aniversario
-Tags
-Categoria | Cadencia
+[YYYY-MM-DD HH:MM] {tipo de interacao}
+{nota da interacao}
+```
 
-## Notas
-...
+Formato do cabecalho inicial (enviado junto da primeira interacao, em `value2`):
 
-## Historico
-- data: descricao da interacao
+```text
+Friends: {nome}
+Telefone: {phone} | Aniversario: {birthday}
+Categoria: {category} | Cadencia: {cadence}
+Tags: {tags separadas por virgula}
+
+---
+
+[YYYY-MM-DD HH:MM] {tipo de interacao}
+{nota da interacao}
 ```
 
 ## 12. Integracao com Google Calendar
 
-Estrategia inicial a ser implementada:
+Estrategia definida:
 
-- comecar com uma sincronizacao simples de lembretes por contato
-- cada sincronizacao deve considerar a cadencia configurada e a data do ultimo contato
-- o backend deve conseguir criar ou atualizar o lembrete vinculado ao amigo
-- o mapeamento local x evento externo deve ser persistido em `calendar_links`
+- sera criado um evento por contato, nao uma rotina central de revisao
+- cada sincronizacao considera a cadencia configurada e a data do ultimo contato
+- o backend cria ou atualiza o evento vinculado ao amigo
+- o mapeamento local x evento externo e persistido em `calendar_links`
+- falhas nao podem impedir gravacao local da interacao
+- apos registrar nova interacao, o evento correspondente deve ser reagendado para `last_contact_at + cadencia`
 
-Decisao tecnica aberta dentro do escopo:
+Autenticacao:
 
-- validar se a primeira versao cria um evento por contato ou uma rotina central de revisao
-
-Essa decisao ainda nao esta fechada, entao continua como atividade tecnica.
+- usar API oficial do Google Calendar com OAuth 2.0
+- `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` ficam em `.env`
+- `refresh_token` do usuario fica em arquivo local fora do repo (ex: `~/.friends/google_token.json`) ou em tabela dedicada no SQLite
+- fluxo OAuth inicial pode ser CLI (copiar codigo do navegador) dado que o app e pessoal
 
 ## 13. Atividades tecnicas
 
 ### 13.1 Setup do repositorio
 
-Atividade: criar estrutura `frontend/` e `backend/` espelhando o projeto `money`
+Atividade: avaliar `friends-dashboard.jsx` e extrair parsers de CSV/VCF, lista de tags sugeridas, paleta de cores e logica de temperatura para reaproveitamento na nova estrutura
 Feito: Nao
+
+Atividade: arquivar `friends-dashboard.jsx` movendo para `legacy/`
+Feito: Sim
+
+Atividade: criar estrutura `frontend/` e `backend/` espelhando o projeto `money`
+Feito: Sim
 
 Atividade: criar `frontend/package.json`, `vite.config.ts`, `tsconfig.json` e `src/`
-Feito: Nao
+Feito: Sim
 
 Atividade: criar `backend/pyproject.toml`, `app/`, `tests/`, `alembic/` e `alembic.ini`
-Feito: Nao
+Feito: Sim
 
 Atividade: criar `Makefile` com comandos de `dev`, `backend`, `frontend`, `lint`, `test`, `migrate`
-Feito: Nao
+Feito: Sim
 
 Atividade: criar `.env.example` com variaveis de app, banco e integracoes
-Feito: Nao
+Feito: Sim
+
+Atividade: criar `.gitignore` cobrindo `.env`, `.venv`, `node_modules`, `*.db` e `.friends/`
+Feito: Sim
 
 ### 13.2 Backend base
 
 Atividade: implementar `backend/app/config.py` com `pydantic-settings`
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar `backend/app/database.py` com engine async SQLite e session factory
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar `backend/app/main.py` com FastAPI, lifespan e healthcheck
-Feito: Nao
+Feito: Sim
 
 Atividade: configurar CORS para frontend local
-Feito: Nao
+Feito: Sim
 
 Atividade: criar pacote `backend/app/models/`
-Feito: Nao
+Feito: Sim
 
 Atividade: criar pacote `backend/app/schemas/`
-Feito: Nao
+Feito: Sim
 
 Atividade: criar pacote `backend/app/routers/`
-Feito: Nao
+Feito: Sim
 
 Atividade: criar pacote `backend/app/services/`
-Feito: Nao
+Feito: Sim
 
 ### 13.3 Banco e migrations
 
 Atividade: modelar ORM de `Friend`
-Feito: Nao
+Feito: Sim
 
 Atividade: modelar ORM de `FriendTag`
-Feito: Nao
+Feito: Sim
 
 Atividade: modelar ORM de `Interaction`
-Feito: Nao
+Feito: Sim
 
 Atividade: modelar ORM de `SyncEvent`
-Feito: Nao
+Feito: Sim
 
 Atividade: modelar ORM de `CalendarLink`
-Feito: Nao
+Feito: Sim
 
 Atividade: criar migration inicial com tabelas principais
-Feito: Nao
+Feito: Sim
 
 Atividade: validar criacao de schema em SQLite local
-Feito: Nao
+Feito: Sim
 
 ### 13.4 Schemas e validacao
 
 Atividade: criar schema de criacao de amigo
-Feito: Nao
+Feito: Sim
 
 Atividade: criar schema de atualizacao parcial de amigo
-Feito: Nao
+Feito: Sim
 
 Atividade: criar schema de resposta de amigo
-Feito: Nao
+Feito: Sim
 
 Atividade: criar schema de criacao de interacao
-Feito: Nao
+Feito: Sim
 
 Atividade: criar schema de resposta de dashboard
-Feito: Nao
+Feito: Sim
 
 Atividade: criar schema de preview de importacao
-Feito: Nao
+Feito: Sim
 
 ### 13.5 Regras de dominio
 
 Atividade: implementar calculo de temperatura em servico dedicado
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar calculo de `days_since_last_contact`
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar calculo de `days_until_next_ping`
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar agregacao de clusters por interesse
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar geracao de ganchos de conversa a partir de tags compartilhadas
-Feito: Nao
+Feito: Sim
 
 ### 13.6 API de amigos
 
 Atividade: implementar router `GET /api/friends`
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar router `POST /api/friends`
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar router `GET /api/friends/{friend_id}`
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar router `PATCH /api/friends/{friend_id}`
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar router `DELETE /api/friends/{friend_id}`
-Feito: Nao
+Feito: Sim
 
 ### 13.7 API de interacoes
 
 Atividade: implementar router `POST /api/friends/{friend_id}/interactions`
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar persistencia local de nova interacao
-Feito: Nao
+Feito: Sim
 
 Atividade: atualizar `last_contact_at` ao registrar interacao
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar router `GET /api/friends/{friend_id}/interactions`
-Feito: Nao
+Feito: Sim
 
 ### 13.8 API de dashboard
 
 Atividade: implementar router `GET /api/dashboard/summary`
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar router `GET /api/dashboard/overdue`
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar router `GET /api/dashboard/clusters`
-Feito: Nao
+Feito: Sim
 
 ### 13.9 API de interesses
 
 Atividade: implementar router `GET /api/interests`
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar router `POST /api/friends/{friend_id}/tags`
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar router `DELETE /api/friends/{friend_id}/tags/{tag}`
-Feito: Nao
+Feito: Sim
 
 ### 13.10 Importacao CSV
 
@@ -593,88 +652,82 @@ Feito: Nao
 Atividade: cobrir parser de VCF com testes
 Feito: Nao
 
-### 13.12 Integracao Evernote
+### 13.12 Integracao Evernote via IFTTT
 
-Atividade: definir variaveis de ambiente para credenciais do Evernote
+Atividade: definir variaveis `IFTTT_WEBHOOK_KEY` e `IFTTT_EVENT_NAME` no `.env.example`
 Feito: Nao
 
-Atividade: implementar cliente de integracao do Evernote em `services/`
+Atividade: implementar cliente IFTTT em `services/ifttt_client.py` com POST para webhook
 Feito: Nao
 
-Atividade: implementar criacao ou localizacao de nota por amigo
+Atividade: implementar servico de sync de interacao (monta titulo `Friends: {nome}` e corpo padrao)
 Feito: Nao
 
-Atividade: implementar renderizacao do corpo padrao da nota
+Atividade: registrar falhas de sync em `sync_events` sem impedir gravacao local
 Feito: Nao
 
-Atividade: implementar append de nova interacao na secao `Historico`
-Feito: Nao
-
-Atividade: persistir `evernote_note_id` localmente
-Feito: Nao
-
-Atividade: registrar falhas de sync em `sync_events`
-Feito: Nao
-
-Atividade: cobrir fluxo de sync com testes de servico
+Atividade: cobrir cliente IFTTT e servico de sync com testes (mockando webhook)
 Feito: Nao
 
 ### 13.13 Integracao Google Calendar
 
-Atividade: definir variaveis de ambiente para credenciais do Google Calendar
+Atividade: definir `GOOGLE_CLIENT_ID` e `GOOGLE_CLIENT_SECRET` no `.env.example`
 Feito: Nao
 
-Atividade: decidir estrategia inicial de lembrete no Calendar
+Atividade: implementar fluxo OAuth inicial via CLI e salvar `refresh_token` em arquivo local fora do repo
 Feito: Nao
 
-Atividade: implementar cliente de integracao do Google Calendar em `services/`
+Atividade: implementar cliente de Google Calendar em `services/calendar_client.py`
 Feito: Nao
 
-Atividade: implementar criacao de lembrete vinculado a amigo
+Atividade: implementar criacao de evento por contato vinculado a amigo
 Feito: Nao
 
-Atividade: implementar atualizacao de lembrete apos nova interacao
+Atividade: implementar reagendamento de evento apos nova interacao (last_contact_at + cadencia)
 Feito: Nao
 
 Atividade: persistir `external_event_id` em `calendar_links`
 Feito: Nao
 
+Atividade: cobrir cliente de Calendar com testes mockando API externa
+Feito: Nao
+
 ### 13.14 Frontend base
 
 Atividade: criar app React com TypeScript e Vite em `frontend/`
-Feito: Nao
+Feito: Sim
 
 Atividade: configurar React Router em `src/App.tsx`
-Feito: Nao
+Feito: Sim
 
 Atividade: configurar Tailwind CSS
-Feito: Nao
+Feito: Sim
 
 Atividade: criar `src/services/api.ts`
-Feito: Nao
+Feito: Sim
 
 Atividade: criar `src/types/`
-Feito: Nao
+Feito: Sim
 
 Atividade: criar layout base da aplicacao
-Feito: Nao
+Feito: Sim
 
 ### 13.15 Frontend dashboard
 
 Atividade: criar `DashboardPage`
-Feito: Nao
+Feito: Sim
 
 Atividade: criar componente de resumo estatistico
-Feito: Nao
+Feito: Sim
 
 Atividade: criar lista de temperatura das amizades
-Feito: Nao
+Feito: Sim
 
 Atividade: criar bloco de contatos atrasados
-Feito: Nao
+Feito: Sim
 
 Atividade: criar bloco de clusters por interesse
-Feito: Nao
+Feito: Sim
 
 ### 13.16 Frontend contatos
 
@@ -753,19 +806,19 @@ Feito: Nao
 ### 13.20 Testes
 
 Atividade: configurar pytest no backend
-Feito: Nao
+Feito: Sim
 
 Atividade: criar `conftest.py` inicial
-Feito: Nao
+Feito: Sim
 
 Atividade: testar calculo de temperatura
-Feito: Nao
+Feito: Sim
 
 Atividade: testar CRUD de amigos
-Feito: Nao
+Feito: Sim
 
 Atividade: testar registro de interacao
-Feito: Nao
+Feito: Sim
 
 Atividade: testar parser de CSV
 Feito: Nao

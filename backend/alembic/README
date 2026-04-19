@@ -1,0 +1,7 @@
+Alembic migrations para o app Friends.
+
+Uso:
+- criar nova migration: `make migration MSG="add friends table"`
+- aplicar migrations: `make migrate`
+
+A URL do banco e lida de `app.config.settings.database_url`.
