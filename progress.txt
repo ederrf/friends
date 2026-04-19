@@ -25,6 +25,38 @@ Proximo passo sugerido:
 - item
 
 Data: 2026-04-19
+Iteracao: Importacao CSV no backend (13.10)
+Resumo: parser CSV em servico dedicado com autodeteccao de colunas (heuristica para Google Contacts/Outlook em pt-BR e en), endpoints `/api/import/csv/preview` e `/api/import/csv/commit` via multipart, e suite com 41 testes (parser puro + integracao). Total: 116 testes verdes.
+Decisoes:
+- usei `csv.Sniffer` para detectar separador (`,`, `;`, tab) com fallback para excel — cobre exports comuns sem precisar do usuario configurar
+- autodeteccao via prefixo normalizado (lowercase + so a-z0-9) com lista de sinonimos por campo; primeira correspondencia ganha
+- `_split_tags` aceita virgula, ponto e virgula e pipe — tags vem em formatos variados
+- preview devolve `suggested_mapping` para o frontend ja exibir o mapping pre-preenchido (editavel antes do commit)
+- commit re-parseia o arquivo (stateless) — a alternativa seria armazenar uma sessao de import no DB, complexidade nao justificada
+- `mapping` e obrigatorio no commit (vs opcional no preview) para evitar persistir contatos com base em autodeteccao errada por silencio
+- erros por linha sao acumulados em `errors[]` em vez de abortar o commit todo — usuario pode reimportar so as linhas com falha
+- multipart com `file: UploadFile` + `payload: Form(str JSON)` em vez de extender base64 no JSON — mais idiomatico e leve
+- limite de 10 MB por arquivo (~50k linhas) com erro `IMPORT_FILE_TOO_LARGE`
+- decoding utf-8 com fallback latin-1 (`errors=replace`) — exports do Windows costumam vir em latin-1, nao quero abortar por byte ruim
+- `parse_birthday` aceita 6 formatos comuns (ISO, DD/MM, MM/DD, YYYYMMDD); ignora silenciosamente datas vCard parciais (`--MM-DD`)
+- VCF (13.11) reusara a mesma estrutura de schema (`ImportPreview/Candidate/Commit`) — esqueleto ja preparado
+Arquivos alterados:
+- backend/app/services/import_service.py (novo: parser, autodeteccao, preview, commit)
+- backend/app/routers/import_.py (novo: endpoints multipart)
+- backend/app/routers/__init__.py (export do `import_router`)
+- backend/app/main.py (registro do router)
+- backend/app/schemas/import_.py (campo `mapping` opcional no commit, `suggested_mapping` no preview, `notes` em candidate, alias `ImportField`)
+- backend/tests/test_import_csv.py (novo: 41 testes)
+- PRD.md (13.10 marcado como Sim)
+- progress.txt (esta entrada)
+Pendencias:
+- 13.11 VCF (parser + endpoints) — proxima iteracao
+- 13.19 Frontend de importacao depende dos dois para fechar o fluxo
+Proximo passo sugerido:
+- 13.11 importacao VCF reusando a mesma estrutura
+- depois 13.19 (Frontend modal de import com etapas upload → mapping → preview → commit)
+
+Data: 2026-04-19
 Iteracao: Frontend interesses (13.18)
 Resumo: InterestsPage com 3 secoes — lista global de tags com contagem (chips), grid de clusters compartilhados (>=2 amigos) reusando ClusterCard, e bloco ambar de interesses unicos (friend_count=1). Header mostra contagem agregada e botao Atualizar que recarrega ambos os fetches. Build limpo (68 modulos, 85 KB gzip).
 Decisoes:

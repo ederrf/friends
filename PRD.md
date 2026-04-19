@@ -624,19 +624,19 @@ Feito: Sim
 ### 13.10 Importacao CSV
 
 Atividade: implementar parser de CSV em servico dedicado
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar autodeteccao de colunas
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar preview de importacao de CSV
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar confirmacao de importacao de CSV
-Feito: Nao
+Feito: Sim
 
 Atividade: cobrir parser de CSV com testes
-Feito: Nao
+Feito: Sim
 
 ### 13.11 Importacao VCF
 

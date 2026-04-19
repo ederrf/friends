@@ -14,6 +14,7 @@ from app.errors import register_error_handlers
 from app.routers import (
     dashboard_router,
     friends_router,
+    import_router,
     interactions_router,
     interests_router,
     tags_router,
@@ -58,6 +59,7 @@ app.include_router(interactions_router)
 app.include_router(dashboard_router)
 app.include_router(interests_router)
 app.include_router(tags_router)
+app.include_router(import_router)
 
 
 # ── Health check ─────────────────────────────────────────────────
