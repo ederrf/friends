@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import AlphabetNav, { nameInitial } from "../components/AlphabetNav";
 import BulkActionsBar from "../components/BulkActionsBar";
 import ErrorBanner from "../components/ErrorBanner";
 import FriendCard from "../components/FriendCard";
@@ -48,6 +49,7 @@ function FriendsPage() {
   const [importOpen, setImportOpen] = useState(false);
   const [mergeOpen, setMergeOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
+  const [initial, setInitial] = useState<string | null>(null);
 
   const list = useFetch(() => friendsApi.list(filters), [
     filters.category,
@@ -55,12 +57,32 @@ function FriendsPage() {
     filters.tag,
   ]);
 
-  // Ids visiveis na pagina (respeitando filtros) — base pro "selecionar
-  // todos" e pra limpar selecao quando um id some da lista (ex.: depois
-  // de um bulk delete ou mudanca de filtro).
+  // Contagem de amigos por inicial (para o AlphabetNav). Calculada sobre
+  // a lista ja filtrada pelo backend — combina com category/cadence/tag.
+  const initialCounts = useMemo(() => {
+    const counts: Record<string, number> = {};
+    for (const f of list.data ?? []) {
+      const key = nameInitial(f.name);
+      counts[key] = (counts[key] ?? 0) + 1;
+    }
+    return counts;
+  }, [list.data]);
+
+  // Lista efetivamente visivel depois do filtro de inicial. Se a letra
+  // ativa perde todos os amigos (ex.: apos delete ou mudanca de filtro),
+  // caimos em `list.data` sem aviso — o AlphabetNav mostra a letra
+  // desabilitada e o usuario clica noutra.
+  const visibleFriends = useMemo(() => {
+    const all = list.data ?? [];
+    if (!initial) return all;
+    return all.filter((f) => nameInitial(f.name) === initial);
+  }, [list.data, initial]);
+
+  // Ids visiveis na pagina (respeitando todos os filtros, inclusive o
+  // de inicial). Base pro "selecionar todos" e pra limpar selecao.
   const visibleIds = useMemo(
-    () => new Set((list.data ?? []).map((f) => f.id)),
-    [list.data],
+    () => new Set(visibleFriends.map((f) => f.id)),
+    [visibleFriends],
   );
 
   // Intersecta a selecao com o que esta visivel: se o usuario aplica
@@ -188,7 +210,7 @@ function FriendsPage() {
   };
 
   // Lista de Friend objects para o MergeModal (precisa dos dados, nao so ids).
-  const selectedFriends = (list.data ?? []).filter((f) =>
+  const selectedFriends = visibleFriends.filter((f) =>
     effectiveSelected.has(f.id),
   );
 
@@ -243,13 +265,20 @@ function FriendsPage() {
         <div>
           <h1 className="text-2xl font-semibold text-slate-900">Amigos</h1>
           <p className="text-sm text-slate-500">
-            {list.data ? `${list.data.length} resultados` : "carregando..."}
-            {activeFiltersCount > 0 && (
+            {list.data
+              ? initial
+                ? `${visibleFriends.length} em ${initial} · ${list.data.length} total`
+                : `${list.data.length} resultados`
+              : "carregando..."}
+            {(activeFiltersCount > 0 || initial) && (
               <>
                 {" · "}
                 <button
                   type="button"
-                  onClick={() => setFilters({})}
+                  onClick={() => {
+                    setFilters({});
+                    setInitial(null);
+                  }}
                   className="underline hover:text-slate-700"
                 >
                   limpar filtros
@@ -303,6 +332,15 @@ function FriendsPage() {
         </label>
       </section>
 
+      {list.data && list.data.length > 0 && (
+        <AlphabetNav
+          counts={initialCounts}
+          active={initial}
+          onSelect={setInitial}
+          totalCount={list.data.length}
+        />
+      )}
+
       <ErrorBanner error={list.error} onRetry={list.reload} />
 
       {effectiveSelected.size > 0 && (
@@ -323,15 +361,17 @@ function FriendsPage() {
       {list.loading && <Loader />}
 
       {list.data &&
-        (list.data.length === 0 ? (
+        (visibleFriends.length === 0 ? (
           <div className="rounded-xl bg-white p-8 text-center text-sm text-slate-500 ring-1 ring-inset ring-slate-200">
-            {activeFiltersCount > 0
-              ? "Nenhum amigo corresponde aos filtros."
-              : "Nenhum amigo cadastrado ainda. Crie o primeiro."}
+            {list.data.length === 0
+              ? activeFiltersCount > 0
+                ? "Nenhum amigo corresponde aos filtros."
+                : "Nenhum amigo cadastrado ainda. Crie o primeiro."
+              : `Nenhum amigo começa com "${initial}".`}
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {list.data.map((friend) => (
+            {visibleFriends.map((friend) => (
               <FriendCard
                 key={friend.id}
                 friend={friend}

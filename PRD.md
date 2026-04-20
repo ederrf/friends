@@ -877,6 +877,9 @@ Feito: Sim
 Atividade: cobrir merge com testes (happy path, colisao de tags, campos vazios preenchidos, primary dentro de source_ids, primary 404)
 Feito: Sim
 
+Atividade: navegador A-Z acima da lista com contagem por letra e normalizacao de acentos — filtra frontend-only em cima da lista ja filtrada pelo backend
+Feito: Sim
+
 ## 14. Ordem recomendada de implementacao
 
 1. Estruturar repositorio real com frontend e backend.

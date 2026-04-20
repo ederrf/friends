@@ -25,6 +25,24 @@ Proximo passo sugerido:
 - item
 
 Data: 2026-04-20
+Iteracao: Navegador A-Z na lista de amigos (13.22, acao adicional)
+Resumo: Strip A-Z acima da lista com contagem por letra; clicar em uma letra filtra os amigos cujo nome comeca com ela, clicar de novo limpa. Letras sem amigos ficam desabilitadas para indicar gaps. Funciona junto com os filtros existentes (category/cadence/tag) — conta e filtra em cima da lista ja retornada pelo backend.
+Decisoes:
+- Frontend-only: backend ja devolve ordenado por nome, e contagem por letra precisa da lista inteira de qualquer forma. Evita query param novo no backend e da feedback instantaneo.
+- Normalizacao de iniciais via NFD + strip combining marks ("Ândrea" -> "A"). Nomes que nao comecam com letra A-Z (numero, simbolo, kanji) caem em "#".
+- Letra ativa de novo = limpa filtro; botao "Todos" sempre visivel a esquerda.
+- Intersecao com selecao pos-existente: o `effectiveSelected` ja filtrava por `visibleIds`, entao mudar a letra ativa some com a selecao que nao casa — coerente com o comportamento de outros filtros.
+Arquivos alterados:
+- frontend/src/components/AlphabetNav.tsx (novo; exporta tambem `nameInitial` para reuso)
+- frontend/src/pages/FriendsPage.tsx (state `initial`, memos de counts e visibleFriends, render condicional)
+- PRD.md (1 atividade em 13.22 marcada Sim)
+- progress.txt (esta entrada)
+Pendencias:
+- 13.13 Google Calendar (unica iteracao do escopo original em aberto).
+Proximo passo sugerido:
+- Usar e ajustar detalhes de UX conforme feedback real (eventual atalho de teclado pra letra, sticky da barra, etc.).
+
+Data: 2026-04-20
 Iteracao: Merge de amigos (13.22, acao adicional)
 Resumo: Adicionada acao "Mergear" ao BulkActionsBar, habilitada quando >=2 selecionados. POST `/api/friends/bulk/merge` funde varios amigos em um primario: interactions migram via UPDATE em massa, tags sao unidas (colisoes deduplicadas), campos escalares vazios do primario sao preenchidos com o 1o nao-vazio dos sources (phone/email/birthday/notes), last_contact_at fica com o max, sources deletados no final. MergeModal com radio pra escolher o primario e preview dos dados (nome, categoria, cadencia, phone/email, tags) de cada selecionado.
 Decisoes:
