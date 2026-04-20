@@ -868,6 +868,15 @@ Feito: Sim
 Atividade: cobrir endpoints de bulk com testes (happy path, not_found, skipped, validacao)
 Feito: Sim
 
+Atividade: acao de merge para fundir duplicatas (POST `/api/friends/bulk/merge`) — primario preservado, interactions e tags migradas, campos vazios preenchidos
+Feito: Sim
+
+Atividade: `MergeModal` no frontend com radio pra escolher o primario + preview dos dados de cada amigo selecionado
+Feito: Sim
+
+Atividade: cobrir merge com testes (happy path, colisao de tags, campos vazios preenchidos, primary dentro de source_ids, primary 404)
+Feito: Sim
+
 ## 14. Ordem recomendada de implementacao
 
 1. Estruturar repositorio real com frontend e backend.

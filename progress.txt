@@ -25,6 +25,33 @@ Proximo passo sugerido:
 - item
 
 Data: 2026-04-20
+Iteracao: Merge de amigos (13.22, acao adicional)
+Resumo: Adicionada acao "Mergear" ao BulkActionsBar, habilitada quando >=2 selecionados. POST `/api/friends/bulk/merge` funde varios amigos em um primario: interactions migram via UPDATE em massa, tags sao unidas (colisoes deduplicadas), campos escalares vazios do primario sao preenchidos com o 1o nao-vazio dos sources (phone/email/birthday/notes), last_contact_at fica com o max, sources deletados no final. MergeModal com radio pra escolher o primario e preview dos dados (nome, categoria, cadencia, phone/email, tags) de cada selecionado.
+Decisoes:
+- name/category/cadence do primario NUNCA sao sobrescritos (escolhas do usuario); apenas campos de "fato" (phone/email/birthday/notes) sao complementados.
+- Colisao de tag (source tem tag que primario ja tem) resolve deletando via `src.tags.remove(ft)` — dispara delete-orphan. Move as novas via `ft.friend = primary` (nao `ft.friend_id = primary_id`) pra manter o cache bidirecional do ORM sincronizado, senao cascade na delecao do source removeria as tags recem-movidas.
+- CalendarLink dos sources e deletado (unique (friend_id, provider) impediria move); primario mantem o seu.
+- SyncEvent aponta pra Interaction.id, entao acompanha automaticamente a interaction migrada — zero logica especial.
+- primary_id dentro de source_ids filtrado silenciosamente; sources inexistentes entram em `not_found` sem erro.
+- limite de 50 sources por request (merge e mais caro que delete/touch; 50 e suficiente pra caso real de duplicatas).
+Arquivos alterados:
+- backend/app/schemas/friend.py (MergePayload, MergeResult)
+- backend/app/services/friend_service.py (merge_friends + helpers, +~120 linhas)
+- backend/app/routers/friends.py (POST /bulk/merge)
+- backend/tests/test_friends_merge.py (novo; 12 testes)
+- frontend/src/types/index.ts (MergeResult)
+- frontend/src/services/friendsApi.ts (bulkMerge)
+- frontend/src/components/MergeModal.tsx (novo)
+- frontend/src/components/BulkActionsBar.tsx (botao Mergear)
+- frontend/src/pages/FriendsPage.tsx (wire do MergeModal + handler)
+- PRD.md (3 atividades novas em 13.22 marcadas Sim)
+- progress.txt (esta entrada)
+Pendencias:
+- 13.13 Google Calendar (unica iteracao do escopo original em aberto).
+Proximo passo sugerido:
+- Usar na pratica; o usuario pode pedir ajustes no merge apos o primeiro uso real com dados importados.
+
+Data: 2026-04-20
 Iteracao: Acoes em massa na lista de amigos (13.22)
 Resumo: Adicionada selecao multipla na FriendsPage com barra de acoes sticky. Tres operacoes no backend via endpoints `/api/friends/bulk/*`: delete, touch (marca como contatado agora -> temperatura Quente) e tags (add/remove). Resposta uniforme `BulkOpResult{affected, not_found, skipped}` cobre os tres casos de saida (aplicado, id inexistente, no-op). Frontend com checkbox no `FriendCard` e `BulkActionsBar` com popover de tag (aplicar ou remover) + confirm nativo pra delete.
 Decisoes:

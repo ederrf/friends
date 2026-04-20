@@ -91,3 +91,28 @@ class BulkOpResult(BaseModel):
     affected: int
     not_found: list[int] = Field(default_factory=list)
     skipped: list[int] = Field(default_factory=list)
+
+
+# ── Merge ────────────────────────────────────────────────────────
+
+
+class MergePayload(BaseModel):
+    """Funde varios amigos (sources) em um primario.
+
+    `primary_id` e o amigo que sera preservado; `source_ids` sao fundidos
+    nele e deletados ao final. Ids duplicados e a presenca do `primary_id`
+    dentro de `source_ids` sao tratados silenciosamente pelo servico.
+    """
+
+    primary_id: int = Field(..., gt=0)
+    source_ids: list[int] = Field(..., min_length=1, max_length=50)
+
+
+class MergeResult(BaseModel):
+    """Resposta do merge, com o amigo resultante ja hidratado."""
+
+    friend: FriendRead
+    merged: int  # sources efetivamente fundidos
+    not_found: list[int] = Field(default_factory=list)
+    interactions_moved: int
+    tags_added: int

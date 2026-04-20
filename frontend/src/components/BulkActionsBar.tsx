@@ -11,6 +11,7 @@ type Props = {
   onTouch: () => void;
   onApplyTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
+  onMerge: () => void;
 };
 
 /**
@@ -36,7 +37,9 @@ function BulkActionsBar({
   onTouch,
   onApplyTag,
   onRemoveTag,
+  onMerge,
 }: Props) {
+  const canMerge = selectedCount >= 2;
   const [tagOpen, setTagOpen] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [tagMode, setTagMode] = useState<"add" | "remove">("add");
@@ -75,6 +78,19 @@ function BulkActionsBar({
       </button>
 
       <div className="ml-auto flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={onMerge}
+          disabled={!canMerge}
+          title={
+            canMerge
+              ? "Fundir os selecionados em um primário"
+              : "Selecione pelo menos 2 amigos para mergear"
+          }
+          className="rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-semibold text-white hover:bg-emerald-400 disabled:cursor-not-allowed disabled:bg-slate-600 disabled:text-slate-400"
+        >
+          Mergear
+        </button>
         <button
           type="button"
           onClick={onTouch}

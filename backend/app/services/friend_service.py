@@ -15,9 +15,17 @@ from sqlalchemy.orm import selectinload
 
 from app.config import settings
 from app.errors import ConflictError, NotFoundError
+from app.models.calendar_link import CalendarLink
 from app.models.friend import Cadence, Category, Friend
 from app.models.friend_tag import FriendTag
-from app.schemas.friend import BulkOpResult, FriendCreate, FriendRead, FriendUpdate
+from app.models.interaction import Interaction
+from app.schemas.friend import (
+    BulkOpResult,
+    FriendCreate,
+    FriendRead,
+    FriendUpdate,
+    MergeResult,
+)
 from app.services.friendship import compute_friend_metrics
 
 
@@ -301,3 +309,148 @@ async def bulk_remove_tag(
 
     skipped = sorted(i for i in found if i not in had_set)
     return BulkOpResult(affected=len(had_set), not_found=not_found, skipped=skipped)
+
+
+# ── Merge ────────────────────────────────────────────────────────
+#
+# Uso tipico pos-import: CSV/VCF trouxe duplicatas do mesmo contato.
+# O usuario seleciona os duplicados, escolhe o "canonico" (primary) e
+# os demais sao fundidos nele:
+#   - Interactions: FK migra pro primary (preserva historico).
+#   - Tags: uniao deduplicada. FriendTag tem unique (friend_id, tag);
+#     colisao resolve deletando a do source em vez de mover.
+#   - CalendarLink: primary mantem o seu; sources sao descartados
+#     (unique (friend_id, provider) impediria move).
+#   - last_contact_at: max entre todos (coerente com interaction_service).
+#   - Campos escalares vazios do primary (phone/email/birthday/notes)
+#     sao preenchidos com o primeiro nao-vazio dos sources, na ordem
+#     recebida. Nome/category/cadence sao escolhas do usuario, nunca
+#     sobrescritas.
+#   - Sources sao deletados ao final (cascade limpa residuos: se um
+#     FriendTag ficou no source por ja existir no primary, ele vai
+#     embora com o source).
+#
+# SyncEvent aponta pra Interaction.id, nao friend_id — acompanha a
+# interaction movida automaticamente, sem intervencao.
+
+
+_FILLABLE_SCALARS = ("phone", "email", "birthday", "notes")
+
+
+def _fill_empty_from_sources(primary: Friend, sources: list[Friend]) -> None:
+    """Preenche campos escalares vazios do primary com o 1o nao-vazio dos sources."""
+    for field in _FILLABLE_SCALARS:
+        if getattr(primary, field):
+            continue
+        for src in sources:
+            val = getattr(src, field)
+            if val:
+                setattr(primary, field, val)
+                break
+
+
+async def merge_friends(
+    session: AsyncSession,
+    primary_id: int,
+    source_ids: list[int],
+) -> MergeResult:
+    """Funde sources no primary.
+
+    - primary_id inexistente -> 404.
+    - source_ids duplicados e a presenca do primary_id em source_ids
+      sao filtrados silenciosamente (ids patologicos no payload nao
+      devem virar erro).
+    - sources inexistentes entram em `not_found`.
+    - Se sobrarem 0 sources validos, retorna o primary sem mudanca
+      e `merged=0`.
+    """
+    primary = await _get_friend_orm(session, primary_id)  # 404 aqui
+
+    # Dedup + remove o primary de dentro da lista de sources
+    unique_sources = [
+        i for i in _dedupe_preserving_order(source_ids) if i != primary_id
+    ]
+    found = await _existing_ids(session, unique_sources)
+    not_found = [i for i in unique_sources if i not in found]
+    valid_source_ids = [i for i in unique_sources if i in found]
+
+    if not valid_source_ids:
+        return MergeResult(
+            friend=to_read(primary),
+            merged=0,
+            not_found=not_found,
+            interactions_moved=0,
+            tags_added=0,
+        )
+
+    # Carrega sources com tags e last_contact_at pra usar nos merges
+    sources_stmt = (
+        select(Friend)
+        .options(selectinload(Friend.tags))
+        .where(Friend.id.in_(valid_source_ids))
+    )
+    # Preserva a ordem pedida (importante pra "primeiro nao-vazio")
+    sources_by_id = {
+        s.id: s for s in (await session.execute(sources_stmt)).scalars().all()
+    }
+    sources = [sources_by_id[i] for i in valid_source_ids]
+
+    # ── Interactions: FK move pro primary em massa ──
+    interactions_result = await session.execute(
+        update(Interaction)
+        .where(Interaction.friend_id.in_(valid_source_ids))
+        .values(friend_id=primary_id)
+    )
+    interactions_moved = interactions_result.rowcount or 0
+
+    # ── Tags: move as novas, deleta as colisoes ──
+    #
+    # Reatribuimos via `ft.friend = primary` (lado many-to-one da relacao)
+    # em vez de `ft.friend_id = primary_id`. O primeiro caminho mantem
+    # `src.tags` e `primary.tags` sincronizados no cache do ORM — senao
+    # a cascade do `delete-orphan` em `session.delete(src)` mais abaixo
+    # acabaria apagando as tags recem-movidas.
+    primary_tags = {t.tag for t in primary.tags}
+    tags_added = 0
+    for src in sources:
+        for ft in list(src.tags):
+            if ft.tag in primary_tags:
+                # Colisao: source tem tag que o primary ja tem. Remover
+                # da colecao do source dispara delete-orphan e apaga.
+                src.tags.remove(ft)
+            else:
+                ft.friend = primary
+                primary_tags.add(ft.tag)
+                tags_added += 1
+
+    # ── CalendarLink: primary mantem; sources sao descartados ──
+    # Delete explicito antes do source.delete() pra evitar surpresa com
+    # cascade + unique constraint caso alguem mude o modelo.
+    await session.execute(
+        delete(CalendarLink).where(CalendarLink.friend_id.in_(valid_source_ids))
+    )
+
+    # ── last_contact_at: max entre todos ──
+    candidates = [primary.last_contact_at] + [s.last_contact_at for s in sources]
+    non_null = [c for c in candidates if c is not None]
+    if non_null:
+        primary.last_contact_at = max(non_null)
+
+    # ── Preenche campos escalares vazios do primary ──
+    _fill_empty_from_sources(primary, sources)
+
+    await session.flush()
+
+    # ── Delete sources ──
+    for src in sources:
+        await session.delete(src)
+    await session.flush()
+
+    # Re-carrega o primary com tags atualizadas pra hidratacao correta
+    return MergeResult(
+        friend=await get_friend(session, primary_id),
+        merged=len(valid_source_ids),
+        not_found=not_found,
+        interactions_moved=interactions_moved,
+        tags_added=tags_added,
+    )

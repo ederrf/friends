@@ -144,3 +144,11 @@ export type BulkOpResult = {
   not_found: number[];
   skipped: number[];
 };
+
+export type MergeResult = {
+  friend: Friend;
+  merged: number;
+  not_found: number[];
+  interactions_moved: number;
+  tags_added: number;
+};

@@ -10,6 +10,7 @@ import type {
   Friend,
   FriendCreatePayload,
   FriendUpdatePayload,
+  MergeResult,
 } from "../types";
 
 export type FriendListFilters = {
@@ -46,4 +47,6 @@ export const friendsApi = {
     api.post<BulkOpResult>("/friends/bulk/tags/add", { ids, tag }),
   bulkRemoveTag: (ids: number[], tag: string) =>
     api.post<BulkOpResult>("/friends/bulk/tags/remove", { ids, tag }),
+  bulkMerge: (primary_id: number, source_ids: number[]) =>
+    api.post<MergeResult>("/friends/bulk/merge", { primary_id, source_ids }),
 };

@@ -6,6 +6,7 @@ import FriendCard from "../components/FriendCard";
 import FriendForm from "../components/FriendForm";
 import ImportModal from "../components/ImportModal";
 import Loader from "../components/Loader";
+import MergeModal from "../components/MergeModal";
 import Modal from "../components/Modal";
 import { useFetch } from "../hooks/useFetch";
 import { friendsApi, type FriendListFilters } from "../services/friendsApi";
@@ -45,6 +46,7 @@ function FriendsPage() {
     | { kind: "edit"; friend: Friend }
   >({ kind: "none" });
   const [importOpen, setImportOpen] = useState(false);
+  const [mergeOpen, setMergeOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const list = useFetch(() => friendsApi.list(filters), [
@@ -159,6 +161,36 @@ function FriendsPage() {
       `com tag "${tag}" removida`,
     );
   };
+
+  const handleMergeConfirm = async (primaryId: number, sourceIds: number[]) => {
+    try {
+      const result = await friendsApi.bulkMerge(primaryId, sourceIds);
+      const parts = [
+        `${result.friend.name}: ${result.merged} fundido${result.merged === 1 ? "" : "s"}`,
+      ];
+      if (result.interactions_moved > 0) {
+        parts.push(`${result.interactions_moved} interações`);
+      }
+      if (result.tags_added > 0) {
+        parts.push(`${result.tags_added} tags`);
+      }
+      if (result.not_found.length > 0) {
+        parts.push(`${result.not_found.length} não encontrados`);
+      }
+      toast.success(parts.join(" · "));
+      setMergeOpen(false);
+      clearSelection();
+      list.reload();
+    } catch (err) {
+      const e = err as { message?: string };
+      toast.error(e.message ?? "Falha ao mergear.");
+    }
+  };
+
+  // Lista de Friend objects para o MergeModal (precisa dos dados, nao so ids).
+  const selectedFriends = (list.data ?? []).filter((f) =>
+    effectiveSelected.has(f.id),
+  );
 
   const handleCreate = async (payload: FriendCreatePayload) => {
     const created = await friendsApi.create(payload);
@@ -284,6 +316,7 @@ function FriendsPage() {
           onTouch={handleBulkTouch}
           onApplyTag={handleBulkApplyTag}
           onRemoveTag={handleBulkRemoveTag}
+          onMerge={() => setMergeOpen(true)}
         />
       )}
 
@@ -342,6 +375,13 @@ function FriendsPage() {
         open={importOpen}
         onClose={() => setImportOpen(false)}
         onImported={() => list.reload()}
+      />
+
+      <MergeModal
+        open={mergeOpen && selectedFriends.length >= 2}
+        onClose={() => setMergeOpen(false)}
+        friends={selectedFriends}
+        onConfirm={handleMergeConfirm}
       />
     </div>
   );

@@ -14,6 +14,8 @@ from app.schemas.friend import (
     FriendCreate,
     FriendRead,
     FriendUpdate,
+    MergePayload,
+    MergeResult,
 )
 from app.services import friend_service
 
@@ -77,6 +79,22 @@ async def bulk_remove_tag(
     session: AsyncSession = Depends(get_db),
 ) -> BulkOpResult:
     return await friend_service.bulk_remove_tag(session, payload.ids, payload.tag)
+
+
+@router.post("/bulk/merge", response_model=MergeResult)
+async def merge_friends(
+    payload: MergePayload,
+    session: AsyncSession = Depends(get_db),
+) -> MergeResult:
+    """Funde varios amigos (sources) em um primario.
+
+    Uso tipico: limpar duplicatas criadas por imports. Interactions dos
+    sources migram pro primary, tags sao unificadas, sources sao
+    deletados. Veja `friend_service.merge_friends` para detalhes.
+    """
+    return await friend_service.merge_friends(
+        session, payload.primary_id, payload.source_ids
+    )
 
 
 @router.get("/{friend_id}", response_model=FriendRead)
