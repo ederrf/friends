@@ -846,6 +846,28 @@ Feito: Sim
 Atividade: documentar setup local minimo no `README` quando o app real existir
 Feito: Sim
 
+### 13.22 Acoes em massa na lista de amigos
+
+Motivacao: apos um import de CSV/VCF com muitos contatos irrelevantes, o usuario precisa limpar/categorizar em lote sem abrir um por vez.
+
+Atividade: endpoint `POST /api/friends/bulk/delete` com payload `{ids: int[]}` e resposta uniforme `{affected, not_found, skipped}`
+Feito: Sim
+
+Atividade: endpoint `POST /api/friends/bulk/touch` para marcar `last_contact_at = agora` em lote (temperatura vai para Quente)
+Feito: Sim
+
+Atividade: endpoints `POST /api/friends/bulk/tags/add` e `POST /api/friends/bulk/tags/remove`
+Feito: Sim
+
+Atividade: checkbox no `FriendCard` + state de selecao em `FriendsPage`, intersectando selecao com o que esta visivel apos filtros
+Feito: Sim
+
+Atividade: `BulkActionsBar` sticky com acoes "Excluir", "Marcar contatado hoje" e popover de Aplicar/Remover tag
+Feito: Sim
+
+Atividade: cobrir endpoints de bulk com testes (happy path, not_found, skipped, validacao)
+Feito: Sim
+
 ## 14. Ordem recomendada de implementacao
 
 1. Estruturar repositorio real com frontend e backend.

@@ -6,14 +6,18 @@ dominio calculadas em `services.friendship`.
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+from sqlalchemy import delete, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.errors import NotFoundError
+from app.config import settings
+from app.errors import ConflictError, NotFoundError
 from app.models.friend import Cadence, Category, Friend
 from app.models.friend_tag import FriendTag
-from app.schemas.friend import FriendCreate, FriendRead, FriendUpdate
+from app.schemas.friend import BulkOpResult, FriendCreate, FriendRead, FriendUpdate
 from app.services.friendship import compute_friend_metrics
 
 
@@ -137,3 +141,163 @@ async def delete_friend(session: AsyncSession, friend_id: int) -> None:
     friend = await _get_friend_orm(session, friend_id)
     await session.delete(friend)
     await session.flush()
+
+
+# ── Bulk actions ─────────────────────────────────────────────────
+#
+# Estrategia comum:
+#   1. descobre quais ids existem (uma unica query)
+#   2. calcula `not_found` antes de mutar
+#   3. aplica a acao via UPDATE/DELETE em massa (sem ORM por item)
+#   4. devolve BulkOpResult uniforme
+#
+# Ids duplicados no payload sao deduplicados; a ordem de `not_found`
+# preserva a do request pra facilitar debug no frontend.
+
+
+def _dedupe_preserving_order(ids: list[int]) -> list[int]:
+    seen: set[int] = set()
+    out: list[int] = []
+    for i in ids:
+        if i not in seen:
+            seen.add(i)
+            out.append(i)
+    return out
+
+
+async def _existing_ids(session: AsyncSession, ids: list[int]) -> set[int]:
+    if not ids:
+        return set()
+    result = await session.execute(select(Friend.id).where(Friend.id.in_(ids)))
+    return set(result.scalars().all())
+
+
+async def bulk_delete_friends(
+    session: AsyncSession, ids: list[int]
+) -> BulkOpResult:
+    """Apaga em lote. Cascata de tags/interactions e garantida pelo modelo."""
+    unique_ids = _dedupe_preserving_order(ids)
+    found = await _existing_ids(session, unique_ids)
+    not_found = [i for i in unique_ids if i not in found]
+
+    if found:
+        # Iteramos via ORM pra acionar cascade delete configurado no modelo
+        # (FriendTag / Interaction). DELETE IN() direto pularia isso no SQLite.
+        for friend in (
+            (await session.execute(select(Friend).where(Friend.id.in_(found))))
+            .scalars()
+            .all()
+        ):
+            await session.delete(friend)
+        await session.flush()
+
+    return BulkOpResult(affected=len(found), not_found=not_found)
+
+
+async def bulk_touch_friends(
+    session: AsyncSession, ids: list[int]
+) -> BulkOpResult:
+    """Marca `last_contact_at = agora` em lote.
+
+    Util depois de um import massivo: neutraliza a temperatura dos
+    contatos sem criar Interaction — e acao de limpeza, nao registro
+    de interacao real. Se quiser um `Interaction` de verdade, use o
+    endpoint individual de interacoes.
+
+    `last_contact_at` so avanca (coerente com a regra do
+    interaction_service): se algum amigo ja tiver contato mais recente,
+    o touch ainda assim sobrescreve — e acao explicita do usuario,
+    entao aqui nao fazemos o `max()` que faz sentido na rota de
+    interacao historica.
+    """
+    unique_ids = _dedupe_preserving_order(ids)
+    found = await _existing_ids(session, unique_ids)
+    not_found = [i for i in unique_ids if i not in found]
+
+    if found:
+        now = datetime.now(ZoneInfo(settings.timezone))
+        await session.execute(
+            update(Friend).where(Friend.id.in_(found)).values(last_contact_at=now)
+        )
+        await session.flush()
+
+    return BulkOpResult(affected=len(found), not_found=not_found)
+
+
+async def bulk_add_tag(
+    session: AsyncSession, ids: list[int], raw_tag: str
+) -> BulkOpResult:
+    """Aplica a mesma tag a varios amigos.
+
+    - normaliza a tag (lower + strip); tag vazia => 409 TAG_INVALID.
+    - amigos que ja possuem a tag entram em `skipped` (nao e erro).
+    - ids inexistentes entram em `not_found`.
+    """
+    tag = _normalize_tag(raw_tag)
+    if not tag:
+        raise ConflictError(
+            "TAG_INVALID", "Tag vazia apos normalizacao.", tag=raw_tag
+        )
+
+    unique_ids = _dedupe_preserving_order(ids)
+    found = await _existing_ids(session, unique_ids)
+    not_found = [i for i in unique_ids if i not in found]
+
+    if not found:
+        return BulkOpResult(affected=0, not_found=not_found)
+
+    already_stmt = select(FriendTag.friend_id).where(
+        FriendTag.friend_id.in_(found), FriendTag.tag == tag
+    )
+    already_set = set((await session.execute(already_stmt)).scalars().all())
+    to_add = [i for i in unique_ids if i in found and i not in already_set]
+
+    for fid in to_add:
+        session.add(FriendTag(friend_id=fid, tag=tag))
+    if to_add:
+        await session.flush()
+
+    return BulkOpResult(
+        affected=len(to_add),
+        not_found=not_found,
+        skipped=sorted(already_set),
+    )
+
+
+async def bulk_remove_tag(
+    session: AsyncSession, ids: list[int], raw_tag: str
+) -> BulkOpResult:
+    """Remove a tag de varios amigos.
+
+    Ids sem a tag entram em `skipped`. Diferente do endpoint individual
+    (que devolve 404 pra tag ausente), em lote ausencia nao e erro —
+    o usuario esta limpando e nao e obrigado a saber quem tinha o que.
+    """
+    tag = _normalize_tag(raw_tag)
+    if not tag:
+        raise ConflictError(
+            "TAG_INVALID", "Tag vazia apos normalizacao.", tag=raw_tag
+        )
+
+    unique_ids = _dedupe_preserving_order(ids)
+    found = await _existing_ids(session, unique_ids)
+    not_found = [i for i in unique_ids if i not in found]
+
+    if not found:
+        return BulkOpResult(affected=0, not_found=not_found)
+
+    had_stmt = select(FriendTag.friend_id).where(
+        FriendTag.friend_id.in_(found), FriendTag.tag == tag
+    )
+    had_set = set((await session.execute(had_stmt)).scalars().all())
+
+    if had_set:
+        await session.execute(
+            delete(FriendTag).where(
+                FriendTag.friend_id.in_(had_set), FriendTag.tag == tag
+            )
+        )
+        await session.flush()
+
+    skipped = sorted(i for i in found if i not in had_set)
+    return BulkOpResult(affected=len(had_set), not_found=not_found, skipped=skipped)

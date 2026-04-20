@@ -136,3 +136,11 @@ export type ImportCommitResponse = {
 };
 
 export type ImportKind = "csv" | "vcf";
+
+// ── Bulk actions ─────────────────────────────────────────────────
+
+export type BulkOpResult = {
+  affected: number;
+  not_found: number[];
+  skipped: number[];
+};

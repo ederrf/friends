@@ -24,6 +24,33 @@ Proximo passo sugerido:
 - item
 - item
 
+Data: 2026-04-20
+Iteracao: Acoes em massa na lista de amigos (13.22)
+Resumo: Adicionada selecao multipla na FriendsPage com barra de acoes sticky. Tres operacoes no backend via endpoints `/api/friends/bulk/*`: delete, touch (marca como contatado agora -> temperatura Quente) e tags (add/remove). Resposta uniforme `BulkOpResult{affected, not_found, skipped}` cobre os tres casos de saida (aplicado, id inexistente, no-op). Frontend com checkbox no `FriendCard` e `BulkActionsBar` com popover de tag (aplicar ou remover) + confirm nativo pra delete.
+Decisoes:
+- "setar temperatura" virou `bulk_touch` porque temperatura e derivada (cadence + last_contact_at); mexer diretamente quebraria o modelo. Decisao alinhada com o usuario (opcao B).
+- `bulk_touch` NAO cria registros em `Interaction` — e acao de limpeza, nao registro de contato real; se o usuario quiser Interaction de verdade, usa o endpoint individual.
+- delete via ORM iteration para acionar cascade de FriendTag/Interaction (SQLite nao propaga DELETE IN() com cascade configurada em Python).
+- seleção intersectada com `visibleIds` na FriendsPage: filtros que escondem parte da selecao so aplicam acao ao que esta visivel (evita confusao).
+- `not_found` e silencioso (200 com lista de ids) em vez de 404: operacoes em massa pos-filtro podem ter corrida com delete externo, e melhor retornar summary que falhar a operacao inteira.
+- limite de 500 ids por request: protege contra payload patologico e lock longo.
+Arquivos alterados:
+- backend/app/schemas/friend.py (BulkIdsPayload, BulkTagPayload, BulkOpResult)
+- backend/app/services/friend_service.py (bulk_delete_friends, bulk_touch_friends, bulk_add_tag, bulk_remove_tag)
+- backend/app/routers/friends.py (4 rotas sob /bulk)
+- backend/tests/test_friends_bulk.py (novo; 16 testes)
+- frontend/src/types/index.ts (BulkOpResult)
+- frontend/src/services/friendsApi.ts (bulkDelete/bulkTouch/bulkAddTag/bulkRemoveTag)
+- frontend/src/components/FriendCard.tsx (checkbox + destaque de selecao)
+- frontend/src/components/BulkActionsBar.tsx (novo)
+- frontend/src/pages/FriendsPage.tsx (state de selecao + wire de acoes)
+- PRD.md (secao 13.22 nova, 7 atividades marcadas Sim)
+- progress.txt (esta entrada)
+Pendencias:
+- 13.13 Google Calendar (unica iteracao do escopo original em aberto).
+Proximo passo sugerido:
+- Decidir se segue 13.13 ou se ha outras melhorias de UX/cleanup que o uso real do app esta pedindo.
+
 Data: 2026-04-19
 Iteracao: Integracao Evernote via IFTTT (13.1 + 13.12)
 Resumo: Fechada a integracao com Evernote via IFTTT Maker Webhooks. Cliente `ifttt_client` com POST JSON `{value1,value2,value3}` para `https://maker.ifttt.com/trigger/{event}/with/key/{key}`, levantando `IftttConfigError` (503) quando falta configuracao e `IftttWebhookError` (502) em erro de rede/4xx/5xx. Servico `evernote_service` monta titulo `Friends: {nome}` e corpo conforme PRD §11 (cabecalho com phone/birthday/categoria/cadencia/tags apenas no primeiro append bem-sucedido; linhas `[YYYY-MM-DD HH:MM] tipo\\nnota`). Router `/api/integrations/evernote/friends/{id}/sync` devolve `SyncEventRead`. Falhas sao persistidas em `sync_events` com commit explicito antes de re-propagar (sobrevive ao rollback do handler global). 13.1 (avaliar friends-dashboard.jsx) tambem fechada — ja havia sido coberta pelo fluxo principal de paginas.

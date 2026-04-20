@@ -6,6 +6,10 @@ type Props = {
   friend: Friend;
   onEdit: (friend: Friend) => void;
   onDelete: (friend: Friend) => void;
+  // Seleção em massa (opcional): quando `selected` é definido, o card
+  // renderiza um checkbox no topo e aplica destaque visual.
+  selected?: boolean;
+  onToggleSelect?: (friend: Friend) => void;
 };
 
 function formatPing(days: number | null | undefined): string {
@@ -27,13 +31,35 @@ function formatSince(days: number | null | undefined): string {
  * - acoes inline (editar, excluir)
  * - nome e clicavel (navega pro detalhe)
  */
-function FriendCard({ friend, onEdit, onDelete }: Props) {
+function FriendCard({
+  friend,
+  onEdit,
+  onDelete,
+  selected,
+  onToggleSelect,
+}: Props) {
   const overdue =
     friend.days_until_next_ping !== null && friend.days_until_next_ping < 0;
+  const selectable = onToggleSelect !== undefined;
 
   return (
-    <article className="flex flex-col gap-3 rounded-xl bg-white p-4 ring-1 ring-inset ring-slate-200">
+    <article
+      className={`flex flex-col gap-3 rounded-xl bg-white p-4 ring-1 ring-inset transition-colors ${
+        selected
+          ? "ring-2 ring-slate-900 bg-slate-50"
+          : "ring-slate-200"
+      }`}
+    >
       <div className="flex items-start justify-between gap-3">
+        {selectable && (
+          <input
+            type="checkbox"
+            checked={!!selected}
+            onChange={() => onToggleSelect?.(friend)}
+            aria-label={`Selecionar ${friend.name}`}
+            className="mt-1 size-4 rounded border-slate-300 text-slate-900 focus:ring-slate-400"
+          />
+        )}
         <div className="min-w-0 flex-1">
           <Link
             to={`/friends/${friend.id}`}

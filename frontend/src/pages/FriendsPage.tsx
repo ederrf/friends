@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import BulkActionsBar from "../components/BulkActionsBar";
 import ErrorBanner from "../components/ErrorBanner";
 import FriendCard from "../components/FriendCard";
 import FriendForm from "../components/FriendForm";
@@ -8,7 +9,13 @@ import Loader from "../components/Loader";
 import Modal from "../components/Modal";
 import { useFetch } from "../hooks/useFetch";
 import { friendsApi, type FriendListFilters } from "../services/friendsApi";
-import type { Cadence, Category, Friend, FriendCreatePayload } from "../types";
+import type {
+  BulkOpResult,
+  Cadence,
+  Category,
+  Friend,
+  FriendCreatePayload,
+} from "../types";
 
 const CATEGORY_OPTIONS: { value: Category; label: string }[] = [
   { value: "rekindle", label: "Reavivar" },
@@ -38,12 +45,120 @@ function FriendsPage() {
     | { kind: "edit"; friend: Friend }
   >({ kind: "none" });
   const [importOpen, setImportOpen] = useState(false);
+  const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
 
   const list = useFetch(() => friendsApi.list(filters), [
     filters.category,
     filters.cadence,
     filters.tag,
   ]);
+
+  // Ids visiveis na pagina (respeitando filtros) — base pro "selecionar
+  // todos" e pra limpar selecao quando um id some da lista (ex.: depois
+  // de um bulk delete ou mudanca de filtro).
+  const visibleIds = useMemo(
+    () => new Set((list.data ?? []).map((f) => f.id)),
+    [list.data],
+  );
+
+  // Intersecta a selecao com o que esta visivel: se o usuario aplica
+  // um filtro que esconde parte da selecao, a barra mostra so o que e
+  // relevante para o filtro atual (evita confusao com ids "fantasma").
+  const effectiveSelected = useMemo(
+    () => new Set([...selectedIds].filter((id) => visibleIds.has(id))),
+    [selectedIds, visibleIds],
+  );
+
+  const toggleSelect = (friend: Friend) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(friend.id)) next.delete(friend.id);
+      else next.add(friend.id);
+      return next;
+    });
+  };
+
+  const allVisibleSelected =
+    visibleIds.size > 0 && effectiveSelected.size === visibleIds.size;
+
+  const selectAllOrClear = () => {
+    if (allVisibleSelected) {
+      setSelectedIds(new Set());
+    } else {
+      setSelectedIds(new Set(visibleIds));
+    }
+  };
+
+  const clearSelection = () => setSelectedIds(new Set());
+
+  const summarize = (
+    action: string,
+    result: BulkOpResult,
+    unit = "amigos",
+  ): string => {
+    const parts = [`${result.affected} ${unit} ${action}`];
+    if (result.skipped.length > 0) {
+      parts.push(`${result.skipped.length} sem efeito`);
+    }
+    if (result.not_found.length > 0) {
+      parts.push(`${result.not_found.length} nao encontrados`);
+    }
+    return parts.join(" · ");
+  };
+
+  const runBulk = async (
+    fn: () => Promise<BulkOpResult>,
+    okLabel: string,
+    unit = "amigos",
+  ) => {
+    try {
+      const result = await fn();
+      toast.success(summarize(okLabel, result, unit));
+      clearSelection();
+      list.reload();
+    } catch (err) {
+      const e = err as { message?: string };
+      toast.error(e.message ?? "Falha na operacao em lote.");
+    }
+  };
+
+  const handleBulkDelete = () => {
+    const ids = [...effectiveSelected];
+    if (ids.length === 0) return;
+    const ok = window.confirm(
+      `Excluir ${ids.length} amigo${ids.length === 1 ? "" : "s"}? ` +
+        "Interações e tags também serão removidas.",
+    );
+    if (!ok) return;
+    void runBulk(() => friendsApi.bulkDelete(ids), "excluídos");
+  };
+
+  const handleBulkTouch = () => {
+    const ids = [...effectiveSelected];
+    if (ids.length === 0) return;
+    void runBulk(
+      () => friendsApi.bulkTouch(ids),
+      "marcados como contatados",
+    );
+  };
+
+  const handleBulkApplyTag = (tag: string) => {
+    const ids = [...effectiveSelected];
+    if (ids.length === 0) return;
+    void runBulk(
+      () => friendsApi.bulkAddTag(ids, tag),
+      `com tag "${tag}" aplicada`,
+    );
+  };
+
+  const handleBulkRemoveTag = (tag: string) => {
+    const ids = [...effectiveSelected];
+    if (ids.length === 0) return;
+    void runBulk(
+      () => friendsApi.bulkRemoveTag(ids, tag),
+      `com tag "${tag}" removida`,
+    );
+  };
 
   const handleCreate = async (payload: FriendCreatePayload) => {
     const created = await friendsApi.create(payload);
@@ -158,6 +273,20 @@ function FriendsPage() {
 
       <ErrorBanner error={list.error} onRetry={list.reload} />
 
+      {effectiveSelected.size > 0 && (
+        <BulkActionsBar
+          selectedCount={effectiveSelected.size}
+          totalCount={visibleIds.size}
+          allSelected={allVisibleSelected}
+          onSelectAll={selectAllOrClear}
+          onClear={clearSelection}
+          onDelete={handleBulkDelete}
+          onTouch={handleBulkTouch}
+          onApplyTag={handleBulkApplyTag}
+          onRemoveTag={handleBulkRemoveTag}
+        />
+      )}
+
       {list.loading && <Loader />}
 
       {list.data &&
@@ -175,6 +304,8 @@ function FriendsPage() {
                 friend={friend}
                 onEdit={(f) => setModal({ kind: "edit", friend: f })}
                 onDelete={handleDelete}
+                selected={effectiveSelected.has(friend.id)}
+                onToggleSelect={toggleSelect}
               />
             ))}
           </div>

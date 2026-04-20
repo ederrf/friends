@@ -57,3 +57,37 @@ class FriendRead(FriendBase):
     days_until_next_ping: int | None = None
     temperature: int = 100
     temperature_label: str = "Quente"
+
+
+# ── Bulk actions ─────────────────────────────────────────────────
+
+
+class BulkIdsPayload(BaseModel):
+    """Lista de ids para operacao em lote.
+
+    Limite superior protege contra payloads patologicos (timeout, lock).
+    Se precisar apagar mais que `max_length`, chame o endpoint em blocos.
+    """
+
+    ids: list[int] = Field(..., min_length=1, max_length=500)
+
+
+class BulkTagPayload(BulkIdsPayload):
+    """Lista de ids + tag para aplicar/remover em lote."""
+
+    tag: str = Field(..., min_length=1, max_length=80)
+
+
+class BulkOpResult(BaseModel):
+    """Resumo uniforme de operacoes em lote.
+
+    - `affected`: quantos de fato mudaram (deletados, atualizados, taggeados).
+    - `not_found`: ids que nao existem no banco — silenciosos por
+      definicao (coerente com apagar em massa apos import onde o usuario
+      pode desmarcar entre clicks).
+    - `skipped`: ids que existiam mas eram no-op (ex.: ja tinham a tag).
+    """
+
+    affected: int
+    not_found: list[int] = Field(default_factory=list)
+    skipped: list[int] = Field(default_factory=list)

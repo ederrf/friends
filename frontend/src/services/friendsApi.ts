@@ -4,6 +4,7 @@
 
 import { api } from "./api";
 import type {
+  BulkOpResult,
   Cadence,
   Category,
   Friend,
@@ -35,4 +36,14 @@ export const friendsApi = {
   update: (id: number, payload: FriendUpdatePayload) =>
     api.patch<Friend>(`/friends/${id}`, payload),
   remove: (id: number) => api.del<void>(`/friends/${id}`),
+
+  // ── Bulk ─────────────────────────────────────────────────────
+  bulkDelete: (ids: number[]) =>
+    api.post<BulkOpResult>("/friends/bulk/delete", { ids }),
+  bulkTouch: (ids: number[]) =>
+    api.post<BulkOpResult>("/friends/bulk/touch", { ids }),
+  bulkAddTag: (ids: number[], tag: string) =>
+    api.post<BulkOpResult>("/friends/bulk/tags/add", { ids, tag }),
+  bulkRemoveTag: (ids: number[], tag: string) =>
+    api.post<BulkOpResult>("/friends/bulk/tags/remove", { ids, tag }),
 };

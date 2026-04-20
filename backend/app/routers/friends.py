@@ -7,7 +7,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.models.friend import Cadence, Category
-from app.schemas.friend import FriendCreate, FriendRead, FriendUpdate
+from app.schemas.friend import (
+    BulkIdsPayload,
+    BulkOpResult,
+    BulkTagPayload,
+    FriendCreate,
+    FriendRead,
+    FriendUpdate,
+)
 from app.services import friend_service
 
 router = APIRouter(prefix="/api/friends", tags=["friends"])
@@ -31,6 +38,45 @@ async def create_friend(
     session: AsyncSession = Depends(get_db),
 ) -> FriendRead:
     return await friend_service.create_friend(session, payload)
+
+
+# ── Bulk actions ─────────────────────────────────────────────────
+#
+# Prefixo `/bulk` evita colisao com `/{friend_id}` (path param int).
+# Todos devolvem `BulkOpResult` pra UI montar toast uniforme.
+
+
+@router.post("/bulk/delete", response_model=BulkOpResult)
+async def bulk_delete_friends(
+    payload: BulkIdsPayload,
+    session: AsyncSession = Depends(get_db),
+) -> BulkOpResult:
+    return await friend_service.bulk_delete_friends(session, payload.ids)
+
+
+@router.post("/bulk/touch", response_model=BulkOpResult)
+async def bulk_touch_friends(
+    payload: BulkIdsPayload,
+    session: AsyncSession = Depends(get_db),
+) -> BulkOpResult:
+    """Marca os amigos como contatados agora (temperatura -> 100)."""
+    return await friend_service.bulk_touch_friends(session, payload.ids)
+
+
+@router.post("/bulk/tags/add", response_model=BulkOpResult)
+async def bulk_add_tag(
+    payload: BulkTagPayload,
+    session: AsyncSession = Depends(get_db),
+) -> BulkOpResult:
+    return await friend_service.bulk_add_tag(session, payload.ids, payload.tag)
+
+
+@router.post("/bulk/tags/remove", response_model=BulkOpResult)
+async def bulk_remove_tag(
+    payload: BulkTagPayload,
+    session: AsyncSession = Depends(get_db),
+) -> BulkOpResult:
+    return await friend_service.bulk_remove_tag(session, payload.ids, payload.tag)
 
 
 @router.get("/{friend_id}", response_model=FriendRead)
