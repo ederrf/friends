@@ -92,3 +92,47 @@ export type DashboardOverdueResponse = {
 export type DashboardClustersResponse = {
   clusters: InterestCluster[];
 };
+
+// ── Import ─────────────────────────────────────────────────────
+
+// Campos canonicos para os quais o usuario pode mapear colunas CSV.
+export type ImportField =
+  | "name"
+  | "phone"
+  | "email"
+  | "birthday"
+  | "notes"
+  | "tags"
+  | "ignore";
+
+export type ImportCandidate = {
+  source_index: number;
+  name: string;
+  phone: string | null;
+  email: string | null;
+  birthday: string | null;
+  notes: string | null;
+  tags: string[];
+};
+
+export type ImportPreview = {
+  total: number;
+  candidates: ImportCandidate[];
+  detected_fields: string[]; // headers CSV; vazio em VCF
+  suggested_mapping: Record<string, ImportField>;
+};
+
+export type ImportCommitPayload = {
+  approved_indexes: number[];
+  default_category: Category;
+  default_cadence: Cadence;
+  mapping?: Record<string, ImportField>; // obrigatorio em CSV, ignorado em VCF
+};
+
+export type ImportCommitResponse = {
+  imported: number;
+  skipped: number;
+  errors: string[];
+};
+
+export type ImportKind = "csv" | "vcf";

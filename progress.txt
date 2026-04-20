@@ -25,6 +25,37 @@ Proximo passo sugerido:
 - item
 
 Data: 2026-04-19
+Iteracao: Frontend importacao (13.19)
+Resumo: ImportModal com 4 etapas (upload, mapeamento CSV, selecao de contatos, resultado), CTA "Importar" na FriendsPage ao lado de "+ Novo amigo", drag-drop + click-to-select, detecta CSV vs VCF por extensao. Build limpo (70 modulos, 88 KB gzip).
+Decisoes:
+- fluxo: upload → (mapping so pra CSV) → select → done. VCF pula direto pra select
+- detecao do tipo pela extensao do arquivo (.vcf/.vcard → vcf; resto → csv) — corresponde ao que o backend oferece
+- backend e stateless, entao guardo o File em state e re-envio no commit (preview devolve o mapping sugerido, usuario edita, re-preview com mapping, depois commit com mesmo arquivo)
+- `importApi` usa `fetch` direto porque o helper `api` fixa `Content-Type: application/json`; multipart precisa do browser definir boundary
+- StepIndicator com chips coloridos (slate=atual, emerald=concluido, slate-50=futuro) — poucas etapas, nao justifica biblioteca
+- mapping step: validacao client-side exige ao menos um campo "name"; caso contrario, botao Continuar desabilitado com aviso ambar (mesmo aviso do backend, porem antes do round-trip)
+- select step: "marcar todos" alterna entre todos/nenhum; default e todos selecionados (UX comum em imports)
+- selects para category/cadence padrao ficam junto com a lista — mesmo passo, scroll natural
+- done step lista ate 10 erros por linha com agregador "... e mais N" (quando sao milhares, nao queremos reduzir performance)
+- toast de sucesso (react-hot-toast) + callback `onImported` para a pagina recarregar a lista
+- reset total do state via useEffect quando `open` vira false, para nao herdar estado entre sessoes
+- Modal reutilizado com size="lg" (ja existente); sem dependencia nova
+- botao "Importar" em estilo secundario (ring) pra nao competir com o CTA principal "+ Novo amigo"
+Arquivos alterados:
+- frontend/src/types/index.ts (ImportField/ImportCandidate/ImportPreview/ImportCommitPayload/ImportCommitResponse/ImportKind)
+- frontend/src/services/importApi.ts (novo: multipart preview/commit)
+- frontend/src/components/ImportModal.tsx (novo: 4 etapas em um so arquivo)
+- frontend/src/pages/FriendsPage.tsx (CTA Importar + ImportModal)
+- PRD.md (13.19 marcado como Sim)
+- progress.txt (esta entrada)
+Pendencias:
+- quando o arquivo tem muitos contatos (>200), a tabela de selecao pode ficar pesada — paginacao/virtualizacao pode vir depois
+- nao ha deteccao de duplicatas (mesmo nome + telefone ja existente); backend tambem permite duplicar. Deixar pra uma iteracao de polimento se virar problema
+Proximo passo sugerido:
+- 13.12 integracao Evernote via IFTTT (cliente HTTP + endpoint + config)
+- 13.13 integracao Google Calendar (ics link generator)
+
+Data: 2026-04-19
 Iteracao: Importacao VCF no backend (13.11)
 Resumo: parser vCard (2.1/3.0) reusando schema de import do CSV, endpoints `/api/import/vcf/preview` e `/api/import/vcf/commit`, 21 testes novos. Total: 137 testes verdes.
 Decisoes:

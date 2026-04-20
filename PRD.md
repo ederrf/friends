@@ -789,19 +789,19 @@ Feito: Sim
 ### 13.19 Frontend importacao
 
 Atividade: criar modal de importacao
-Feito: Nao
+Feito: Sim
 
 Atividade: criar etapa de upload
-Feito: Nao
+Feito: Sim
 
 Atividade: criar etapa de mapeamento de CSV
-Feito: Nao
+Feito: Sim
 
 Atividade: criar etapa de selecao de contatos
-Feito: Nao
+Feito: Sim
 
 Atividade: criar etapa de confirmacao
-Feito: Nao
+Feito: Sim
 
 ### 13.20 Testes
 

@@ -3,6 +3,7 @@ import toast from "react-hot-toast";
 import ErrorBanner from "../components/ErrorBanner";
 import FriendCard from "../components/FriendCard";
 import FriendForm from "../components/FriendForm";
+import ImportModal from "../components/ImportModal";
 import Loader from "../components/Loader";
 import Modal from "../components/Modal";
 import { useFetch } from "../hooks/useFetch";
@@ -36,6 +37,7 @@ function FriendsPage() {
     | { kind: "new" }
     | { kind: "edit"; friend: Friend }
   >({ kind: "none" });
+  const [importOpen, setImportOpen] = useState(false);
 
   const list = useFetch(() => friendsApi.list(filters), [
     filters.category,
@@ -109,13 +111,22 @@ function FriendsPage() {
             )}
           </p>
         </div>
-        <button
-          type="button"
-          onClick={() => setModal({ kind: "new" })}
-          className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
-        >
-          + Novo amigo
-        </button>
+        <div className="flex gap-2">
+          <button
+            type="button"
+            onClick={() => setImportOpen(true)}
+            className="rounded-md bg-white px-3 py-1.5 text-sm font-medium text-slate-700 ring-1 ring-slate-200 hover:bg-slate-50"
+          >
+            Importar
+          </button>
+          <button
+            type="button"
+            onClick={() => setModal({ kind: "new" })}
+            className="rounded-md bg-slate-900 px-3 py-1.5 text-sm font-medium text-white hover:bg-slate-700"
+          >
+            + Novo amigo
+          </button>
+        </div>
       </header>
 
       <section className="grid grid-cols-1 gap-2 rounded-xl bg-white p-3 ring-1 ring-inset ring-slate-200 sm:grid-cols-3">
@@ -195,6 +206,12 @@ function FriendsPage() {
           />
         )}
       </Modal>
+
+      <ImportModal
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => list.reload()}
+      />
     </div>
   );
 }
