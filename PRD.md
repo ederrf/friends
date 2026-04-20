@@ -821,10 +821,10 @@ Atividade: testar registro de interacao
 Feito: Sim
 
 Atividade: testar parser de CSV
-Feito: Nao
+Feito: Sim
 
 Atividade: testar parser de VCF
-Feito: Nao
+Feito: Sim
 
 Atividade: testar fluxo de append no Evernote com mocks
 Feito: Nao
@@ -832,19 +832,19 @@ Feito: Nao
 ### 13.21 Operacao e DX
 
 Atividade: criar script de inicializacao local via `Makefile`
-Feito: Nao
+Feito: Sim
 
 Atividade: criar comando de migration
-Feito: Nao
+Feito: Sim
 
 Atividade: criar comando de testes
-Feito: Nao
+Feito: Sim
 
 Atividade: criar comando de lint
-Feito: Nao
+Feito: Sim
 
 Atividade: documentar setup local minimo no `README` quando o app real existir
-Feito: Nao
+Feito: Sim
 
 ## 14. Ordem recomendada de implementacao
 

@@ -25,6 +25,29 @@ Proximo passo sugerido:
 - item
 
 Data: 2026-04-19
+Iteracao: Operacao e DX + fechamento de testes (13.20 parcial + 13.21)
+Resumo: README novo com setup local, comandos e estrutura; PRD marcado como concluido para 13.20 (CSV/VCF ja cobertos nas iteracoes anteriores, Evernote segue pendente junto com 13.12) e 13.21 completo (Makefile ja existia com dev/backend/frontend/install/migrate/migration/lint/format/test/help).
+Decisoes:
+- tarefas "testar parser de CSV" e "testar parser de VCF" da 13.20 foram cumpridas como parte de 13.10 e 13.11 (62 testes entre as duas suites) — marcando Sim retroativamente para refletir o estado real
+- "testar fluxo de append no Evernote com mocks" fica pendente junto com 13.12 (integracao Evernote) — ambas adiadas a pedido
+- Makefile ja tinha todos os alvos pedidos no PRD (dev/backend/frontend/install/migrate/migration/lint/format/test/help) — 13.21 so precisava do README
+- README em pt-BR, enxuto, focado em: funcionalidades, requisitos, setup rapido, comandos, estrutura, testes, importacao, e escopo nao implementado
+- README declara Node.js 20.19+/22.12+ (Vite 7) e Python 3.11+
+- mencao explicita aos escopos adiados (13.12/13.13) para nao passar impressao de bug/regressao
+- formato de erro da API destacado porque e padrao do PRD §9.7 e contrato publico
+Arquivos alterados:
+- README.md (novo)
+- PRD.md (13.20 CSV/VCF Sim; 13.21 Makefile/migration/test/lint/README Sim)
+- progress.txt (esta entrada)
+Pendencias:
+- 13.12 Evernote via IFTTT (cliente + endpoint + `.env.example`)
+- 13.13 Google Calendar (link ics por amigo / sincronizacao)
+- "testar fluxo de append no Evernote com mocks" sai junto com 13.12
+Proximo passo sugerido:
+- MVP efetivamente utilizavel agora; parar e dogfoodar por alguns dias antes de atacar integracoes externas
+- quando voltar: 13.12 IFTTT (menor esforco, valida um end-to-end com servico externo)
+
+Data: 2026-04-19
 Iteracao: Frontend importacao (13.19)
 Resumo: ImportModal com 4 etapas (upload, mapeamento CSV, selecao de contatos, resultado), CTA "Importar" na FriendsPage ao lado de "+ Novo amigo", drag-drop + click-to-select, detecta CSV vs VCF por extensao. Build limpo (70 modulos, 88 KB gzip).
 Decisoes:
