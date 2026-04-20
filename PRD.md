@@ -459,7 +459,7 @@ Autenticacao:
 ### 13.1 Setup do repositorio
 
 Atividade: avaliar `friends-dashboard.jsx` e extrair parsers de CSV/VCF, lista de tags sugeridas, paleta de cores e logica de temperatura para reaproveitamento na nova estrutura
-Feito: Nao
+Feito: Sim
 
 Atividade: arquivar `friends-dashboard.jsx` movendo para `legacy/`
 Feito: Sim
@@ -655,19 +655,19 @@ Feito: Sim
 ### 13.12 Integracao Evernote via IFTTT
 
 Atividade: definir variaveis `IFTTT_WEBHOOK_KEY` e `IFTTT_EVENT_NAME` no `.env.example`
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar cliente IFTTT em `services/ifttt_client.py` com POST para webhook
-Feito: Nao
+Feito: Sim
 
 Atividade: implementar servico de sync de interacao (monta titulo `Friends: {nome}` e corpo padrao)
-Feito: Nao
+Feito: Sim
 
 Atividade: registrar falhas de sync em `sync_events` sem impedir gravacao local
-Feito: Nao
+Feito: Sim
 
 Atividade: cobrir cliente IFTTT e servico de sync com testes (mockando webhook)
-Feito: Nao
+Feito: Sim
 
 ### 13.13 Integracao Google Calendar
 
@@ -827,7 +827,7 @@ Atividade: testar parser de VCF
 Feito: Sim
 
 Atividade: testar fluxo de append no Evernote com mocks
-Feito: Nao
+Feito: Sim
 
 ### 13.21 Operacao e DX
 

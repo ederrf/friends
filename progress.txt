@@ -25,6 +25,31 @@ Proximo passo sugerido:
 - item
 
 Data: 2026-04-19
+Iteracao: Integracao Evernote via IFTTT (13.1 + 13.12)
+Resumo: Fechada a integracao com Evernote via IFTTT Maker Webhooks. Cliente `ifttt_client` com POST JSON `{value1,value2,value3}` para `https://maker.ifttt.com/trigger/{event}/with/key/{key}`, levantando `IftttConfigError` (503) quando falta configuracao e `IftttWebhookError` (502) em erro de rede/4xx/5xx. Servico `evernote_service` monta titulo `Friends: {nome}` e corpo conforme PRD §11 (cabecalho com phone/birthday/categoria/cadencia/tags apenas no primeiro append bem-sucedido; linhas `[YYYY-MM-DD HH:MM] tipo\\nnota`). Router `/api/integrations/evernote/friends/{id}/sync` devolve `SyncEventRead`. Falhas sao persistidas em `sync_events` com commit explicito antes de re-propagar (sobrevive ao rollback do handler global). 13.1 (avaliar friends-dashboard.jsx) tambem fechada — ja havia sido coberta pelo fluxo principal de paginas.
+Decisoes:
+- usar httpx.AsyncClient injetavel (para MockTransport em testes) com timeout 10s/5s connect.
+- contar apenas SUCCESS em `_previous_successful_sync_count` — uma tentativa FAILED nao consome o cabecalho porque a nota no Evernote nao foi criada.
+- cross-friend lookup: `_get_interaction` exige friend_id casado, evitando leak entre amigos via 404.
+- persistencia do FAILED: `session.commit()` explicito antes de `raise`, porque o handler de erros do FastAPI faz rollback implicito.
+- chave/evento em `.env.example` com placeholders e comentario curto sobre onde obter (https://ifttt.com/maker_webhooks).
+Arquivos alterados:
+- backend/.env.example (novo IFTTT_WEBHOOK_KEY, IFTTT_EVENT_NAME + Google placeholders)
+- backend/app/services/ifttt_client.py (novo)
+- backend/app/services/evernote_service.py (novo)
+- backend/app/schemas/sync.py (novo SyncEventRead)
+- backend/app/routers/integrations.py (novo)
+- backend/app/routers/__init__.py (export integrations_router)
+- backend/app/main.py (include_router integrations)
+- backend/tests/test_evernote_sync.py (17 novos testes; httpx.MockTransport + AsyncMock)
+- PRD.md (13.1, 13.12 x5, 13.20 Evernote marcados Sim)
+- progress.txt (esta entrada)
+Pendencias:
+- 13.13 Google Calendar (unica iteracao em aberto).
+Proximo passo sugerido:
+- Decidir com o usuario se segue para 13.13 ou encerra por aqui.
+
+Data: 2026-04-19
 Iteracao: Operacao e DX + fechamento de testes (13.20 parcial + 13.21)
 Resumo: README novo com setup local, comandos e estrutura; PRD marcado como concluido para 13.20 (CSV/VCF ja cobertos nas iteracoes anteriores, Evernote segue pendente junto com 13.12) e 13.21 completo (Makefile ja existia com dev/backend/frontend/install/migrate/migration/lint/format/test/help).
 Decisoes:

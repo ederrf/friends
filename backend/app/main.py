@@ -15,6 +15,7 @@ from app.routers import (
     dashboard_router,
     friends_router,
     import_router,
+    integrations_router,
     interactions_router,
     interests_router,
     tags_router,
@@ -60,6 +61,7 @@ app.include_router(dashboard_router)
 app.include_router(interests_router)
 app.include_router(tags_router)
 app.include_router(import_router)
+app.include_router(integrations_router)
 
 
 # ── Health check ─────────────────────────────────────────────────
