@@ -17,7 +17,8 @@ from app.schemas.friend import (
     MergePayload,
     MergeResult,
 )
-from app.services import friend_service
+from app.schemas.group import BulkGroupPayload
+from app.services import friend_service, group_service
 
 router = APIRouter(prefix="/api/friends", tags=["friends"])
 
@@ -27,10 +28,15 @@ async def list_friends(
     category: Category | None = Query(default=None),
     cadence: Cadence | None = Query(default=None),
     tag: str | None = Query(default=None),
+    group_id: int | None = Query(default=None, ge=1),
     session: AsyncSession = Depends(get_db),
 ) -> list[FriendRead]:
     return await friend_service.list_friends(
-        session, category=category, cadence=cadence, tag=tag
+        session,
+        category=category,
+        cadence=cadence,
+        tag=tag,
+        group_id=group_id,
     )
 
 
@@ -89,11 +95,37 @@ async def merge_friends(
     """Funde varios amigos (sources) em um primario.
 
     Uso tipico: limpar duplicatas criadas por imports. Interactions dos
-    sources migram pro primary, tags sao unificadas, sources sao
-    deletados. Veja `friend_service.merge_friends` para detalhes.
+    sources migram pro primary, tags e grupos sao unificados, sources
+    sao deletados. Veja `friend_service.merge_friends` para detalhes.
     """
     return await friend_service.merge_friends(
         session, payload.primary_id, payload.source_ids
+    )
+
+
+@router.post("/bulk/groups/add", response_model=BulkOpResult)
+async def bulk_add_group(
+    payload: BulkGroupPayload,
+    session: AsyncSession = Depends(get_db),
+) -> BulkOpResult:
+    """Adiciona varios amigos a um grupo de uma vez.
+
+    Reusa `group_service.bulk_add_members` — grupo inexistente vira 404,
+    ids inexistentes entram em `not_found`, ja-membros em `skipped`.
+    """
+    return await group_service.bulk_add_members(
+        session, payload.group_id, payload.ids
+    )
+
+
+@router.post("/bulk/groups/remove", response_model=BulkOpResult)
+async def bulk_remove_group(
+    payload: BulkGroupPayload,
+    session: AsyncSession = Depends(get_db),
+) -> BulkOpResult:
+    """Remove varios amigos de um grupo de uma vez."""
+    return await group_service.bulk_remove_members(
+        session, payload.group_id, payload.ids
     )
 
 

@@ -14,6 +14,7 @@ from app.errors import register_error_handlers
 from app.routers import (
     dashboard_router,
     friends_router,
+    groups_router,
     import_router,
     integrations_router,
     interactions_router,
@@ -56,6 +57,7 @@ register_error_handlers(app)
 
 # ── Routers ──────────────────────────────────────────────────────
 app.include_router(friends_router)
+app.include_router(groups_router)
 app.include_router(interactions_router)
 app.include_router(dashboard_router)
 app.include_router(interests_router)

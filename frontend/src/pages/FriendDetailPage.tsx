@@ -8,6 +8,7 @@ import HooksBlock from "../components/HooksBlock";
 import InteractionForm from "../components/InteractionForm";
 import InteractionTimeline from "../components/InteractionTimeline";
 import Loader from "../components/Loader";
+import GroupsEditor from "../components/GroupsEditor";
 import Modal from "../components/Modal";
 import TagsEditor from "../components/TagsEditor";
 import { useFetch } from "../hooks/useFetch";
@@ -128,6 +129,7 @@ function FriendDetailPage() {
 
         <aside className="space-y-3">
           <TagsEditor friend={friend.data} onChange={handleTagsChange} />
+          <GroupsEditor friend={friend.data} onChange={() => friend.reload()} />
           {clusters.data && (
             <HooksBlock
               friendId={friend.data.id}

@@ -5,6 +5,7 @@ from datetime import date, datetime
 from pydantic import BaseModel, ConfigDict, EmailStr, Field
 
 from app.models.friend import Cadence, Category
+from app.schemas.group import GroupRef
 
 
 class FriendBase(BaseModel):
@@ -51,6 +52,7 @@ class FriendRead(FriendBase):
     created_at: datetime
     updated_at: datetime
     tags: list[str] = Field(default_factory=list)
+    groups: list[GroupRef] = Field(default_factory=list)
 
     # ── Campos derivados (preenchidos pelo servico de dominio) ──
     days_since_last_contact: int | None = None

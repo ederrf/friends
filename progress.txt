@@ -25,6 +25,43 @@ Proximo passo sugerido:
 - item
 
 Data: 2026-04-21
+Iteracao: Grupos de amigos (13.23) — many-to-many com nome, descricao e cor
+Resumo: Introduzido o conceito de Grupo como colecao curada (diferente das tags, que sao atributos livres). Um amigo pode pertencer a varios grupos; cada grupo tem nome unique (ci) + descricao + cor hex. Feito full stack: models + migration + schemas + service + router + testes + UI (pagina de lista, pagina de detalhe, editor inline no FriendDetail, filtro no FriendsPage, popover de bulk no BulkActionsBar). Merge unifica grupos como ja unifica tags. 209 testes passando (27 novos).
+Decisoes:
+- Nome de tabela "groups" (pluralizado) porque GROUP e reservado em SQL; junction "friend_group" segue o padrao de friend_tag.
+- Coexistir com tags, nao substituir — semanticas diferentes (colecao curada vs atributo livre). Forms/cards mostram os dois juntos.
+- Cor armazenada como hex `#RRGGBB` normalizado em lowercase; frontend expoe paleta fixa de 8 cores tailwind-500 para manter chips legiveis, mas o backend aceita qualquer hex valido para evoluir sem migration.
+- Nome case-insensitive unico (`func.lower(Group.name)`) preservando caixa original para display ("RPG", "Familia").
+- Filtro `group_id` em /api/friends retorna lista vazia se o grupo nao existe (consistente com filtro de tag), nao 404.
+- Merge usa `fg.friend = primary` (nao `fg.friend_id = primary_id`) para manter o cache do ORM sincronizado com cascade delete-orphan, igual ao padrao ja usado pra tags.
+- Endpoints duplicados de proposito: `/api/groups/{id}/members/bulk/*` (group-centric, usado em GroupDetailPage) e `/api/friends/bulk/groups/*` (friend-centric, usado em BulkActionsBar).
+- `GroupsEditor` em FriendDetailPage chama a API como fonte da verdade (nao sincroniza 2 estados), mesmo padrao do TagsEditor.
+- FriendCard agora mostra chips coloridos de grupo acima das tags cinzas — discriminacao visual imediata.
+Arquivos alterados:
+- backend/app/models/group.py (novo)
+- backend/app/models/__init__.py, friend.py (export + relacionamento groups)
+- backend/alembic/versions/f1a2b3c4d5e6_add_groups.py (novo)
+- backend/app/schemas/group.py (novo), friend.py (groups em FriendRead)
+- backend/app/services/group_service.py (novo)
+- backend/app/services/friend_service.py (_friend_loaders, group_id filter, merge unifica grupos)
+- backend/app/services/dashboard_service.py (selectinload de groups pra evitar MissingGreenlet)
+- backend/app/routers/groups.py (novo), friends.py (group_id + bulk group), __init__.py, app/main.py
+- backend/tests/test_groups_api.py (novo, 27 testes)
+- frontend/src/types/index.ts (GroupRef, Group, payloads; Friend.groups)
+- frontend/src/services/groupsApi.ts (novo), friendsApi.ts (group_id filter + bulkAddGroup/bulkRemoveGroup)
+- frontend/src/components/GroupChip.tsx (novo), GroupForm.tsx (novo), GroupsEditor.tsx (novo)
+- frontend/src/components/BulkActionsBar.tsx (popover Grupo ▾), FriendCard.tsx (chips de grupo)
+- frontend/src/pages/GroupsPage.tsx (novo), GroupDetailPage.tsx (novo)
+- frontend/src/pages/FriendsPage.tsx (filtro Grupo + handlers bulk), FriendDetailPage.tsx (GroupsEditor)
+- frontend/src/App.tsx (rotas /groups, /groups/:groupId + nav link)
+- PRD.md (secao 13.23)
+- progress.txt (esta entrada)
+Pendencias:
+- 13.13 Google Calendar (unica iteracao do escopo original em aberto).
+Proximo passo sugerido:
+- Retomar 13.13 (Google Calendar).
+
+Data: 2026-04-21
 Iteracao: Atalho "selecionar todos" no header (13.22, acao adicional)
 Resumo: Link "selecionar todos (N)" / "desmarcar todos" adicionado ao header da pagina de amigos, sempre visivel quando ha >=1 amigo visivel. Usa o mesmo handler `selectAllOrClear` que ja existia no BulkActionsBar; N e o tamanho de `visibleIds` (respeita filtros + busca + inicial). Quando todos visiveis estao marcados, vira "desmarcar todos".
 Decisoes:

@@ -19,6 +19,12 @@ export type InteractionType =
   | "email"
   | "other";
 
+export type GroupRef = {
+  id: number;
+  name: string;
+  color: string;
+};
+
 export type Friend = {
   id: number;
   name: string;
@@ -32,6 +38,7 @@ export type Friend = {
   created_at: string;
   updated_at: string;
   tags: string[];
+  groups: GroupRef[];
   days_since_last_contact: number | null;
   days_until_next_ping: number | null;
   temperature: number; // 0-100
@@ -152,3 +159,23 @@ export type MergeResult = {
   interactions_moved: number;
   tags_added: number;
 };
+
+// ── Groups ───────────────────────────────────────────────────────
+
+export type Group = {
+  id: number;
+  name: string;
+  description: string | null;
+  color: string;
+  member_count: number;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GroupCreatePayload = {
+  name: string;
+  description?: string | null;
+  color?: string;
+};
+
+export type GroupUpdatePayload = Partial<GroupCreatePayload>;

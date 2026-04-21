@@ -66,6 +66,10 @@ class Friend(Base):
         back_populates="friend",
         cascade="all, delete-orphan",
     )
+    groups: Mapped[list["FriendGroup"]] = relationship(  # noqa: F821
+        back_populates="friend",
+        cascade="all, delete-orphan",
+    )
     interactions: Mapped[list["Interaction"]] = relationship(  # noqa: F821
         back_populates="friend",
         cascade="all, delete-orphan",

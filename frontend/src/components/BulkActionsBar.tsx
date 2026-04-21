@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { Friend } from "../types";
+import type { Friend, Group } from "../types";
 
 type Props = {
   selectedCount: number;
@@ -12,6 +12,9 @@ type Props = {
   onApplyTag: (tag: string) => void;
   onRemoveTag: (tag: string) => void;
   onMerge: () => void;
+  groups: Group[];
+  onAddGroup: (groupId: number) => void;
+  onRemoveGroup: (groupId: number) => void;
 };
 
 /**
@@ -38,11 +41,16 @@ function BulkActionsBar({
   onApplyTag,
   onRemoveTag,
   onMerge,
+  groups,
+  onAddGroup,
+  onRemoveGroup,
 }: Props) {
   const canMerge = selectedCount >= 2;
   const [tagOpen, setTagOpen] = useState(false);
   const [tagInput, setTagInput] = useState("");
   const [tagMode, setTagMode] = useState<"add" | "remove">("add");
+  const [groupOpen, setGroupOpen] = useState(false);
+  const [groupMode, setGroupMode] = useState<"add" | "remove">("add");
 
   const submitTag = () => {
     const tag = tagInput.trim();
@@ -51,6 +59,12 @@ function BulkActionsBar({
     else onRemoveTag(tag);
     setTagInput("");
     setTagOpen(false);
+  };
+
+  const pickGroup = (groupId: number) => {
+    if (groupMode === "add") onAddGroup(groupId);
+    else onRemoveGroup(groupId);
+    setGroupOpen(false);
   };
 
   return (
@@ -163,6 +177,82 @@ function BulkActionsBar({
                   className="rounded-md bg-slate-900 px-3 py-1 text-xs font-semibold text-white hover:bg-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   Confirmar
+                </button>
+              </div>
+            </div>
+          )}
+        </div>
+
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setGroupOpen((v) => !v)}
+            className="rounded-md bg-slate-700 px-3 py-1.5 text-xs font-semibold text-white hover:bg-slate-600"
+          >
+            Grupo ▾
+          </button>
+          {groupOpen && (
+            <div className="absolute right-0 top-full mt-1 w-64 rounded-lg bg-white p-3 text-slate-700 shadow-xl ring-1 ring-slate-200">
+              <div className="mb-2 flex gap-1 rounded-md bg-slate-100 p-0.5 text-xs font-medium">
+                <button
+                  type="button"
+                  onClick={() => setGroupMode("add")}
+                  className={`flex-1 rounded px-2 py-1 ${
+                    groupMode === "add"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-600"
+                  }`}
+                >
+                  Adicionar
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setGroupMode("remove")}
+                  className={`flex-1 rounded px-2 py-1 ${
+                    groupMode === "remove"
+                      ? "bg-white text-slate-900 shadow-sm"
+                      : "text-slate-600"
+                  }`}
+                >
+                  Remover
+                </button>
+              </div>
+              {groups.length === 0 ? (
+                <p className="py-2 text-center text-xs text-slate-500">
+                  Nenhum grupo cadastrado.
+                </p>
+              ) : (
+                <ul className="max-h-56 divide-y divide-slate-100 overflow-y-auto">
+                  {groups.map((g) => (
+                    <li key={g.id}>
+                      <button
+                        type="button"
+                        onClick={() => pickGroup(g.id)}
+                        className="flex w-full items-center gap-2 px-2 py-1.5 text-left text-xs hover:bg-slate-50"
+                      >
+                        <span
+                          aria-hidden
+                          className="size-3 rounded-full"
+                          style={{ backgroundColor: g.color }}
+                        />
+                        <span className="flex-1 truncate text-slate-800">
+                          {g.name}
+                        </span>
+                        <span className="text-slate-400">
+                          {g.member_count}
+                        </span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              )}
+              <div className="mt-2 flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setGroupOpen(false)}
+                  className="rounded-md px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                >
+                  Cancelar
                 </button>
               </div>
             </div>

@@ -7,6 +7,7 @@ lifespan do FastAPI e nas migrations do Alembic.
 from app.models.calendar_link import CalendarLink, CalendarProvider
 from app.models.friend import Cadence, Category, Friend
 from app.models.friend_tag import FriendTag
+from app.models.group import FriendGroup, Group
 from app.models.interaction import Interaction, InteractionType
 from app.models.sync_event import (
     SyncAction,
@@ -22,7 +23,9 @@ __all__ = [
     "CalendarProvider",
     "Category",
     "Friend",
+    "FriendGroup",
     "FriendTag",
+    "Group",
     "Interaction",
     "InteractionType",
     "SyncAction",

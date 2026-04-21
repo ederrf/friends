@@ -3,6 +3,8 @@ import { Toaster } from "react-hot-toast";
 import DashboardPage from "./pages/DashboardPage";
 import FriendsPage from "./pages/FriendsPage";
 import FriendDetailPage from "./pages/FriendDetailPage";
+import GroupsPage from "./pages/GroupsPage";
+import GroupDetailPage from "./pages/GroupDetailPage";
 import InterestsPage from "./pages/InterestsPage";
 
 function App() {
@@ -17,6 +19,9 @@ function App() {
             <Link to="/friends" className="text-sm text-slate-600 hover:text-slate-900">
               Amigos
             </Link>
+            <Link to="/groups" className="text-sm text-slate-600 hover:text-slate-900">
+              Grupos
+            </Link>
             <Link to="/interests" className="text-sm text-slate-600 hover:text-slate-900">
               Interesses
             </Link>
@@ -27,6 +32,8 @@ function App() {
             <Route path="/" element={<DashboardPage />} />
             <Route path="/friends" element={<FriendsPage />} />
             <Route path="/friends/:friendId" element={<FriendDetailPage />} />
+            <Route path="/groups" element={<GroupsPage />} />
+            <Route path="/groups/:groupId" element={<GroupDetailPage />} />
             <Route path="/interests" element={<InterestsPage />} />
           </Routes>
         </main>

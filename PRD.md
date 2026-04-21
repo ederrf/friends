@@ -886,6 +886,52 @@ Feito: Sim
 Atividade: atalho "selecionar todos (N)" / "desmarcar todos" no header, sempre visivel quando ha amigos — elimina ovo-e-galinha de precisar marcar 1 pra ver o controle dentro do BulkActionsBar
 Feito: Sim
 
+### 13.23 Grupos de amigos
+
+Motivacao: tags sao otimas para atributos livres ("rpg", "trabalho") mas nao substituem colecoes curadas que o usuario pensa como unidades — "Familia", "Time do RPG de quarta", "Faculdade". Um amigo pertence a varios grupos; o grupo tem nome, descricao e cor pra identificacao rapida; as operacoes em lote ganham dois novos verbos (adicionar/remover do grupo). Coexiste com tags, nao substitui.
+
+Atividade: modelos `Group` (id/name unique ci/description/color hex/timestamps) e `FriendGroup` (junction com unique constraint) + migration Alembic + relacionamento `Friend.groups`
+Feito: Sim
+
+Atividade: schemas `GroupCreate/Update/Read/Ref` + validacao de cor hex `#RRGGBB` com normalizacao lowercase + `BulkFriendIdsPayload` e `BulkGroupPayload`
+Feito: Sim
+
+Atividade: `group_service` com CRUD (nome case-insensitive unico via `func.lower`), listagem com `member_count` agregado, membership (add/remove/list), e bulk add/remove de membros
+Feito: Sim
+
+Atividade: router `/api/groups` com CRUD + `GET/POST/DELETE /{id}/members` + `POST /{id}/members/bulk/add|remove`
+Feito: Sim
+
+Atividade: filtro `group_id` em `GET /api/friends` (join com FriendGroup, sem 404 se o grupo nao existe — retorna lista vazia como filtro de tag) e `FriendRead` hidrata `groups: GroupRef[]`
+Feito: Sim
+
+Atividade: endpoints `POST /api/friends/bulk/groups/add` e `POST /api/friends/bulk/groups/remove` (friend-centric, usados pelo `BulkActionsBar`)
+Feito: Sim
+
+Atividade: merge unifica grupos dos sources no primario deduplicando colisoes (mesmo padrao `fg.friend = primary` que preserva o cache do ORM com cascade delete-orphan)
+Feito: Sim
+
+Atividade: cobrir groups com testes — CRUD (incluindo 409 de nome case-insensitive, 400 de cor invalida e nome vazio), listagem com `member_count`, cascade do delete, membership (idempotente, hidrata groups no Friend), bulk (dedupe/not_found/skipped/grupo 404/lista vazia 400), filtro `group_id`, integracao com merge
+Feito: Sim
+
+Atividade: `GroupsPage` em `/groups` com grade de cards (chip + contagem + descricao) e CRUD inline via modal com `GroupForm` (paleta fixa de 8 cores tailwind-500)
+Feito: Sim
+
+Atividade: `GroupDetailPage` em `/groups/:groupId` com cabecalho, lista de membros (com filtro por nome e remocao individual) e modal para adicionar amigos que ainda nao sao membros
+Feito: Sim
+
+Atividade: `GroupsEditor` no `FriendDetailPage` — chips dos grupos atuais + dropdown para adicionar/remover (API como fonte da verdade, reload do `Friend` apos cada operacao)
+Feito: Sim
+
+Atividade: filtro "Grupo" no `FriendsPage` (select com todos os grupos cadastrados) + chips de grupo no `FriendCard` junto das tags
+Feito: Sim
+
+Atividade: popover "Grupo ▾" no `BulkActionsBar` com modo Adicionar/Remover e lista dos grupos cadastrados (clique no grupo aplica imediatamente)
+Feito: Sim
+
+Atividade: nav link "Grupos" e rotas `/groups` + `/groups/:groupId` em `App.tsx`
+Feito: Sim
+
 ## 14. Ordem recomendada de implementacao
 
 1. Estruturar repositorio real com frontend e backend.

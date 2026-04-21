@@ -1,5 +1,6 @@
 import { Link } from "react-router-dom";
 import type { Friend } from "../types";
+import GroupChip from "./GroupChip";
 import TemperatureBadge from "./TemperatureBadge";
 
 type Props = {
@@ -91,8 +92,11 @@ function FriendCard({
         />
       </div>
 
-      {friend.tags.length > 0 && (
+      {(friend.tags.length > 0 || friend.groups.length > 0) && (
         <div className="flex flex-wrap gap-1">
+          {friend.groups.map((g) => (
+            <GroupChip key={g.id} group={g} />
+          ))}
           {friend.tags.map((tag) => (
             <span
               key={tag}

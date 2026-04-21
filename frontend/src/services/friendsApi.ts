@@ -17,6 +17,7 @@ export type FriendListFilters = {
   category?: Category;
   cadence?: Cadence;
   tag?: string;
+  group_id?: number;
 };
 
 function toQueryString(filters: FriendListFilters): string {
@@ -24,6 +25,7 @@ function toQueryString(filters: FriendListFilters): string {
   if (filters.category) params.set("category", filters.category);
   if (filters.cadence) params.set("cadence", filters.cadence);
   if (filters.tag) params.set("tag", filters.tag);
+  if (filters.group_id) params.set("group_id", String(filters.group_id));
   const q = params.toString();
   return q ? `?${q}` : "";
 }
@@ -49,4 +51,8 @@ export const friendsApi = {
     api.post<BulkOpResult>("/friends/bulk/tags/remove", { ids, tag }),
   bulkMerge: (primary_id: number, source_ids: number[]) =>
     api.post<MergeResult>("/friends/bulk/merge", { primary_id, source_ids }),
+  bulkAddGroup: (ids: number[], group_id: number) =>
+    api.post<BulkOpResult>("/friends/bulk/groups/add", { ids, group_id }),
+  bulkRemoveGroup: (ids: number[], group_id: number) =>
+    api.post<BulkOpResult>("/friends/bulk/groups/remove", { ids, group_id }),
 };

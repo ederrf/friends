@@ -11,6 +11,7 @@ import MergeModal from "../components/MergeModal";
 import Modal from "../components/Modal";
 import { useFetch } from "../hooks/useFetch";
 import { friendsApi, type FriendListFilters } from "../services/friendsApi";
+import { groupsApi } from "../services/groupsApi";
 import type {
   BulkOpResult,
   Cadence,
@@ -75,7 +76,9 @@ function FriendsPage() {
     filters.category,
     filters.cadence,
     filters.tag,
+    filters.group_id,
   ]);
+  const groups = useFetch(() => groupsApi.list(), []);
 
   // Aplica a busca por nome (tokens AND, case/acento insensivel) antes
   // de derivar contagens e visibilidade. Se a query e vazia, e a lista
@@ -215,6 +218,31 @@ function FriendsPage() {
       () => friendsApi.bulkRemoveTag(ids, tag),
       `com tag "${tag}" removida`,
     );
+  };
+
+  const handleBulkAddGroup = (groupId: number) => {
+    const ids = [...effectiveSelected];
+    if (ids.length === 0) return;
+    const group = groups.data?.find((g) => g.id === groupId);
+    const label = group ? group.name : `grupo ${groupId}`;
+    void runBulk(
+      () => friendsApi.bulkAddGroup(ids, groupId),
+      `adicionados ao grupo "${label}"`,
+    );
+    // recarrega contagem de membros visivel no filtro
+    groups.reload();
+  };
+
+  const handleBulkRemoveGroup = (groupId: number) => {
+    const ids = [...effectiveSelected];
+    if (ids.length === 0) return;
+    const group = groups.data?.find((g) => g.id === groupId);
+    const label = group ? group.name : `grupo ${groupId}`;
+    void runBulk(
+      () => friendsApi.bulkRemoveGroup(ids, groupId),
+      `removidos do grupo "${label}"`,
+    );
+    groups.reload();
   };
 
   const handleMergeConfirm = async (primaryId: number, sourceIds: number[]) => {
@@ -387,7 +415,7 @@ function FriendsPage() {
             )}
           </div>
         </label>
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
           <FilterSelect
             label="Categoria"
             value={filters.category ?? ""}
@@ -400,6 +428,28 @@ function FriendsPage() {
             options={CADENCE_OPTIONS}
             onChange={(v) => updateFilter("cadence", v as Cadence | "")}
           />
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-600">
+              Grupo
+            </span>
+            <select
+              value={filters.group_id ?? ""}
+              onChange={(e) =>
+                setFilters((f) => ({
+                  ...f,
+                  group_id: e.target.value ? Number(e.target.value) : undefined,
+                }))
+              }
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-slate-400"
+            >
+              <option value="">Todos</option>
+              {(groups.data ?? []).map((g) => (
+                <option key={g.id} value={g.id}>
+                  {g.name}
+                </option>
+              ))}
+            </select>
+          </label>
           <label className="block">
             <span className="mb-1 block text-xs font-medium text-slate-600">
               Tag
@@ -438,6 +488,9 @@ function FriendsPage() {
           onApplyTag={handleBulkApplyTag}
           onRemoveTag={handleBulkRemoveTag}
           onMerge={() => setMergeOpen(true)}
+          groups={groups.data ?? []}
+          onAddGroup={handleBulkAddGroup}
+          onRemoveGroup={handleBulkRemoveGroup}
         />
       )}
 

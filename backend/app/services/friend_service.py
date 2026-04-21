@@ -18,6 +18,7 @@ from app.errors import ConflictError, NotFoundError
 from app.models.calendar_link import CalendarLink
 from app.models.friend import Cadence, Category, Friend
 from app.models.friend_tag import FriendTag
+from app.models.group import FriendGroup
 from app.models.interaction import Interaction
 from app.schemas.friend import (
     BulkOpResult,
@@ -26,6 +27,7 @@ from app.schemas.friend import (
     FriendUpdate,
     MergeResult,
 )
+from app.schemas.group import GroupRef
 from app.services.friendship import compute_friend_metrics
 
 
@@ -47,13 +49,18 @@ def _unique_tags(tags: list[str]) -> list[str]:
 
 
 def to_read(friend: Friend) -> FriendRead:
-    """Converte ORM Friend em FriendRead com metricas e tags hidratadas.
+    """Converte ORM Friend em FriendRead com metricas, tags e grupos.
 
-    Requer que `friend.tags` ja tenha sido carregado (selectinload ou
-    equivalente). Relacao lazy nao e aceita em contexto async.
+    Requer que `friend.tags` e `friend.groups` (+ `FriendGroup.group`)
+    ja tenham sido carregados via selectinload. Relacao lazy nao e aceita
+    em contexto async.
     """
     metrics = compute_friend_metrics(
         friend.cadence, friend.last_contact_at, friend.created_at
+    )
+    group_refs = sorted(
+        (GroupRef.model_validate(fg.group) for fg in friend.groups),
+        key=lambda g: g.name.lower(),
     )
     return FriendRead(
         id=friend.id,
@@ -68,11 +75,20 @@ def to_read(friend: Friend) -> FriendRead:
         created_at=friend.created_at,
         updated_at=friend.updated_at,
         tags=sorted(t.tag for t in friend.tags),
+        groups=group_refs,
         days_since_last_contact=metrics.days_since_last_contact,
         days_until_next_ping=metrics.days_until_next_ping,
         temperature=metrics.temperature,
         temperature_label=metrics.temperature_label,
     )
+
+
+def _friend_loaders():
+    """selectinload padronizado: tags + groups (com Group ref)."""
+    return [
+        selectinload(Friend.tags),
+        selectinload(Friend.groups).selectinload(FriendGroup.group),
+    ]
 
 
 async def list_friends(
@@ -81,9 +97,15 @@ async def list_friends(
     category: Category | None = None,
     cadence: Cadence | None = None,
     tag: str | None = None,
+    group_id: int | None = None,
 ) -> list[FriendRead]:
-    """Lista amigos com filtros opcionais."""
-    stmt = select(Friend).options(selectinload(Friend.tags))
+    """Lista amigos com filtros opcionais.
+
+    `group_id`: restringe a amigos que sao membros do grupo. Grupo
+    inexistente devolve lista vazia (nao 404) — coerente com o filtro
+    de tag (string livre que pode nao casar com nada).
+    """
+    stmt = select(Friend).options(*_friend_loaders())
     if category is not None:
         stmt = stmt.where(Friend.category == category)
     if cadence is not None:
@@ -91,6 +113,10 @@ async def list_friends(
     if tag is not None:
         tag_norm = _normalize_tag(tag)
         stmt = stmt.join(Friend.tags).where(FriendTag.tag == tag_norm)
+    if group_id is not None:
+        stmt = stmt.join(FriendGroup, FriendGroup.friend_id == Friend.id).where(
+            FriendGroup.group_id == group_id
+        )
     stmt = stmt.order_by(Friend.name)
 
     result = await session.execute(stmt)
@@ -98,8 +124,32 @@ async def list_friends(
     return [to_read(f) for f in friends]
 
 
+async def list_friends_by_ids(
+    session: AsyncSession, friend_ids: list[int]
+) -> list[FriendRead]:
+    """Hidrata FriendRead para um conjunto de ids, ordenado por nome.
+
+    Usado por endpoints como `GET /api/groups/{id}/members` que ja
+    calcularam o filtro antes. Ids inexistentes sao ignorados.
+    """
+    if not friend_ids:
+        return []
+    stmt = (
+        select(Friend)
+        .options(*_friend_loaders())
+        .where(Friend.id.in_(friend_ids))
+        .order_by(Friend.name)
+    )
+    result = await session.execute(stmt)
+    return [to_read(f) for f in result.scalars().unique().all()]
+
+
 async def _get_friend_orm(session: AsyncSession, friend_id: int) -> Friend:
-    stmt = select(Friend).options(selectinload(Friend.tags)).where(Friend.id == friend_id)
+    stmt = (
+        select(Friend)
+        .options(*_friend_loaders())
+        .where(Friend.id == friend_id)
+    )
     result = await session.execute(stmt)
     friend = result.scalar_one_or_none()
     if friend is None:
@@ -383,10 +433,10 @@ async def merge_friends(
             tags_added=0,
         )
 
-    # Carrega sources com tags e last_contact_at pra usar nos merges
+    # Carrega sources com tags, groups e last_contact_at pra usar nos merges
     sources_stmt = (
         select(Friend)
-        .options(selectinload(Friend.tags))
+        .options(*_friend_loaders())
         .where(Friend.id.in_(valid_source_ids))
     )
     # Preserva a ordem pedida (importante pra "primeiro nao-vazio")
@@ -422,6 +472,16 @@ async def merge_friends(
                 ft.friend = primary
                 primary_tags.add(ft.tag)
                 tags_added += 1
+
+    # ── Groups: mesma logica das tags (uniao com dedup) ──
+    primary_group_ids = {fg.group_id for fg in primary.groups}
+    for src in sources:
+        for fg in list(src.groups):
+            if fg.group_id in primary_group_ids:
+                src.groups.remove(fg)
+            else:
+                fg.friend = primary
+                primary_group_ids.add(fg.group_id)
 
     # ── CalendarLink: primary mantem; sources sao descartados ──
     # Delete explicito antes do source.delete() pra evitar surpresa com

@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.models.friend import Friend
+from app.models.group import FriendGroup
 from app.schemas.dashboard import (
     DashboardClustersResponse,
     DashboardOverdueResponse,
@@ -30,7 +31,16 @@ from app.services.friendship import cluster_by_interest, is_overdue
 
 
 async def _load_all_friends(session: AsyncSession) -> list[Friend]:
-    stmt = select(Friend).options(selectinload(Friend.tags)).order_by(Friend.name)
+    # tags + groups sao usados por to_read via selectinload; manter alinhado
+    # com friend_service._friend_loaders pra evitar lazy load em async.
+    stmt = (
+        select(Friend)
+        .options(
+            selectinload(Friend.tags),
+            selectinload(Friend.groups).selectinload(FriendGroup.group),
+        )
+        .order_by(Friend.name)
+    )
     result = await session.execute(stmt)
     return list(result.scalars().unique().all())
 
