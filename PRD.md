@@ -926,6 +926,9 @@ Feito: Sim
 Atividade: filtro "Grupo" no `FriendsPage` (select com todos os grupos cadastrados) + chips de grupo no `FriendCard` junto das tags
 Feito: Sim
 
+Atividade: opcao "Nenhum (sem grupo)" no filtro de grupo do `FriendsPage` — envia `no_group=true` pra `GET /api/friends`; backend usa NOT EXISTS, mutuamente exclusivo com `group_id` (400 FILTER_CONFLICT se vierem juntos)
+Feito: Sim
+
 Atividade: popover "Grupo ▾" no `BulkActionsBar` com modo Adicionar/Remover e lista dos grupos cadastrados (clique no grupo aplica imediatamente)
 Feito: Sim
 

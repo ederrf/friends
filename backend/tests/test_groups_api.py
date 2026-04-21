@@ -363,6 +363,74 @@ async def test_friends_list_filtro_group_id(client):
     _ = c  # usado so pra checar que nao foi filtrado
 
 
+async def test_friends_list_filtro_no_group(client):
+    """`no_group=true` devolve so amigos sem nenhum grupo."""
+    g = await _create_group(client, "RPG")
+    a = await _create_friend(client, "Ana")  # vai pro grupo
+    b = await _create_friend(client, "Bruno")  # sem grupo
+    c = await _create_friend(client, "Carla")  # sem grupo
+
+    await client.post(
+        f"/api/groups/{g['id']}/members", json={"friend_id": a["id"]}
+    )
+
+    r = await client.get("/api/friends?no_group=true")
+    assert r.status_code == 200
+    names = [f["name"] for f in r.json()]
+    assert names == ["Bruno", "Carla"]
+
+    # no_group=false explicito nao filtra nada
+    r_false = await client.get("/api/friends?no_group=false")
+    assert r_false.status_code == 200
+    assert [f["name"] for f in r_false.json()] == ["Ana", "Bruno", "Carla"]
+    _ = b, c
+
+
+async def test_friends_list_no_group_depois_de_sair_de_todos(client):
+    """Amigo que entrou e depois saiu do grupo volta a aparecer em no_group."""
+    g = await _create_group(client, "RPG")
+    a = await _create_friend(client, "Ana")
+    await client.post(
+        f"/api/groups/{g['id']}/members", json={"friend_id": a["id"]}
+    )
+    # Nao aparece em no_group enquanto esta no grupo
+    r = await client.get("/api/friends?no_group=true")
+    assert [f["name"] for f in r.json()] == []
+    # Remove do grupo
+    r_del = await client.delete(f"/api/groups/{g['id']}/members/{a['id']}")
+    assert r_del.status_code == 204
+    # Agora aparece
+    r_again = await client.get("/api/friends?no_group=true")
+    assert [f["name"] for f in r_again.json()] == ["Ana"]
+
+
+async def test_friends_list_no_group_com_group_id_conflita(client):
+    """no_group + group_id juntos = 400 FILTER_CONFLICT."""
+    g = await _create_group(client, "RPG")
+    r = await client.get(f"/api/friends?no_group=true&group_id={g['id']}")
+    assert r.status_code == 400
+    body = r.json()
+    assert body["error"]["code"] == "FILTER_CONFLICT"
+
+
+async def test_friends_list_no_group_combina_com_outros_filtros(client):
+    """no_group pode ser combinado com category/cadence/tag normalmente."""
+    g = await _create_group(client, "RPG")
+    # Ana rekindle, no grupo
+    a = await _create_friend(client, "Ana", category="rekindle")
+    # Bruno rekindle, sem grupo
+    b = await _create_friend(client, "Bruno", category="rekindle")
+    # Carla maintain, sem grupo
+    c = await _create_friend(client, "Carla", category="maintain")
+    await client.post(
+        f"/api/groups/{g['id']}/members", json={"friend_id": a["id"]}
+    )
+    r = await client.get("/api/friends?no_group=true&category=rekindle")
+    assert r.status_code == 200
+    assert [f["name"] for f in r.json()] == ["Bruno"]
+    _ = b, c
+
+
 async def test_bulk_add_group_via_friends_endpoint(client):
     g = await _create_group(client, "RPG")
     a = await _create_friend(client, "Ana")

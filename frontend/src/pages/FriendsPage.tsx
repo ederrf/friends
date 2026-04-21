@@ -77,6 +77,7 @@ function FriendsPage() {
     filters.cadence,
     filters.tag,
     filters.group_id,
+    filters.no_group,
   ]);
   const groups = useFetch(() => groupsApi.list(), []);
 
@@ -433,16 +434,25 @@ function FriendsPage() {
               Grupo
             </span>
             <select
-              value={filters.group_id ?? ""}
-              onChange={(e) =>
+              value={
+                filters.no_group
+                  ? "__none__"
+                  : filters.group_id
+                  ? String(filters.group_id)
+                  : ""
+              }
+              onChange={(e) => {
+                const v = e.target.value;
                 setFilters((f) => ({
                   ...f,
-                  group_id: e.target.value ? Number(e.target.value) : undefined,
-                }))
-              }
+                  group_id: v && v !== "__none__" ? Number(v) : undefined,
+                  no_group: v === "__none__" ? true : undefined,
+                }));
+              }}
               className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-slate-400"
             >
               <option value="">Todos</option>
+              <option value="__none__">Nenhum (sem grupo)</option>
               {(groups.data ?? []).map((g) => (
                 <option key={g.id} value={g.id}>
                   {g.name}

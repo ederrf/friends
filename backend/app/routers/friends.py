@@ -6,6 +6,7 @@ from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
+from app.errors import AppError
 from app.models.friend import Cadence, Category
 from app.schemas.friend import (
     BulkIdsPayload,
@@ -29,14 +30,25 @@ async def list_friends(
     cadence: Cadence | None = Query(default=None),
     tag: str | None = Query(default=None),
     group_id: int | None = Query(default=None, ge=1),
+    no_group: bool = Query(default=False),
     session: AsyncSession = Depends(get_db),
 ) -> list[FriendRead]:
+    if no_group and group_id is not None:
+        # Combo sem sentido: "sem grupo" + "no grupo X". Rejeita cedo
+        # pra o frontend nao mandar filtro contraditorio e achar que
+        # o backend esta bugado devolvendo lista vazia.
+        raise AppError(
+            code="FILTER_CONFLICT",
+            message="no_group e group_id sao mutuamente exclusivos.",
+            status_code=400,
+        )
     return await friend_service.list_friends(
         session,
         category=category,
         cadence=cadence,
         tag=tag,
         group_id=group_id,
+        no_group=no_group,
     )
 
 

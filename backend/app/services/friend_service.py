@@ -98,12 +98,17 @@ async def list_friends(
     cadence: Cadence | None = None,
     tag: str | None = None,
     group_id: int | None = None,
+    no_group: bool = False,
 ) -> list[FriendRead]:
     """Lista amigos com filtros opcionais.
 
     `group_id`: restringe a amigos que sao membros do grupo. Grupo
     inexistente devolve lista vazia (nao 404) — coerente com o filtro
     de tag (string livre que pode nao casar com nada).
+
+    `no_group`: restringe a amigos que NAO pertencem a nenhum grupo —
+    util pra encontrar quem ainda nao foi agrupado. Mutuamente exclusivo
+    com `group_id` (o router valida e rejeita o combo).
     """
     stmt = select(Friend).options(*_friend_loaders())
     if category is not None:
@@ -117,6 +122,13 @@ async def list_friends(
         stmt = stmt.join(FriendGroup, FriendGroup.friend_id == Friend.id).where(
             FriendGroup.group_id == group_id
         )
+    elif no_group:
+        # NOT EXISTS e mais claro que outer-join + IS NULL e funciona bem
+        # em SQLite/Postgres sem truques de DISTINCT.
+        subq = select(FriendGroup.friend_id).where(
+            FriendGroup.friend_id == Friend.id
+        )
+        stmt = stmt.where(~subq.exists())
     stmt = stmt.order_by(Friend.name)
 
     result = await session.execute(stmt)

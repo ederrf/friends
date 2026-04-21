@@ -18,6 +18,8 @@ export type FriendListFilters = {
   cadence?: Cadence;
   tag?: string;
   group_id?: number;
+  /** Quando true, devolve so amigos que nao pertencem a nenhum grupo. */
+  no_group?: boolean;
 };
 
 function toQueryString(filters: FriendListFilters): string {
@@ -26,6 +28,7 @@ function toQueryString(filters: FriendListFilters): string {
   if (filters.cadence) params.set("cadence", filters.cadence);
   if (filters.tag) params.set("tag", filters.tag);
   if (filters.group_id) params.set("group_id", String(filters.group_id));
+  if (filters.no_group) params.set("no_group", "true");
   const q = params.toString();
   return q ? `?${q}` : "";
 }
