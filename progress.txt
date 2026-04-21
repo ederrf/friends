@@ -24,6 +24,23 @@ Proximo passo sugerido:
 - item
 - item
 
+Data: 2026-04-21
+Iteracao: Atalho "selecionar todos" no header (13.22, acao adicional)
+Resumo: Link "selecionar todos (N)" / "desmarcar todos" adicionado ao header da pagina de amigos, sempre visivel quando ha >=1 amigo visivel. Usa o mesmo handler `selectAllOrClear` que ja existia no BulkActionsBar; N e o tamanho de `visibleIds` (respeita filtros + busca + inicial). Quando todos visiveis estao marcados, vira "desmarcar todos".
+Decisoes:
+- Motivador: o BulkActionsBar (que tinha "Selecionar todos" ate agora) so aparece apos o usuario marcar 1 amigo manualmente — ovo-e-galinha. O atalho no header resolve com um clique.
+- Placement: ao lado de "limpar filtros" no paragrafo de contagem, mesma estetica de link sublinhado — consistente e discreto, nao polui a UI.
+- Nao removi a acao equivalente do BulkActionsBar: mantendo ambas porque sao zero-custo e cobrem dois fluxos (antes de selecionar / ja tendo selecionado).
+- Contador N no label deixa claro quanto vai ser marcado (importante quando ha filtros/busca restringindo a visibilidade).
+Arquivos alterados:
+- frontend/src/pages/FriendsPage.tsx (novo botao-link no header, condicional em visibleIds.size > 0)
+- PRD.md (atividade adicional em 13.22 marcada Sim)
+- progress.txt (esta entrada)
+Pendencias:
+- 13.13 Google Calendar (unica iteracao do escopo original em aberto).
+Proximo passo sugerido:
+- Nada imediato; mecanica de selecao em massa esta completa.
+
 Data: 2026-04-20
 Iteracao: Busca por nome na lista de amigos (13.22, acao adicional)
 Resumo: Input de busca adicionado ao topo do card de filtros; tokens separados por espaco casam em AND como substrings do nome (case e acento insensiveis via NFD + strip combining marks + lowercase). "ana sil" casa "Ana Silva" e "Mariana Silveira"; "JOSÉ" casa "jose carlos". Busca combina com category/cadence/tag do backend e com o navegador A-Z — as contagens por letra se adaptam conforme o usuario digita (letras sem match ficam desabilitadas). Botao ✕ limpa a busca rapido, "limpar filtros" tambem zera o query. Vazio continua devolvendo a lista completa.

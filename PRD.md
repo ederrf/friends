@@ -883,6 +883,9 @@ Feito: Sim
 Atividade: busca por nome no topo dos filtros — tokens separados por espaco em AND, case/acento insensivel, com botao de limpar e contagens do navegador A-Z adaptativas
 Feito: Sim
 
+Atividade: atalho "selecionar todos (N)" / "desmarcar todos" no header, sempre visivel quando ha amigos — elimina ovo-e-galinha de precisar marcar 1 pra ver o controle dentro do BulkActionsBar
+Feito: Sim
+
 ## 14. Ordem recomendada de implementacao
 
 1. Estruturar repositorio real com frontend e backend.

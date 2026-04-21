@@ -306,6 +306,25 @@ function FriendsPage() {
                 ? `${filteredByQuery.length} para "${query.trim()}" · ${list.data.length} total`
                 : `${list.data.length} resultados`
               : "carregando..."}
+            {visibleIds.size > 0 && (
+              <>
+                {" · "}
+                <button
+                  type="button"
+                  onClick={selectAllOrClear}
+                  className="underline hover:text-slate-700"
+                  title={
+                    allVisibleSelected
+                      ? "Limpar selecao"
+                      : `Marcar os ${visibleIds.size} amigos visiveis`
+                  }
+                >
+                  {allVisibleSelected
+                    ? "desmarcar todos"
+                    : `selecionar todos (${visibleIds.size})`}
+                </button>
+              </>
+            )}
             {(activeFiltersCount > 0 || initial || hasQuery) && (
               <>
                 {" · "}
