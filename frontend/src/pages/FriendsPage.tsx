@@ -33,6 +33,25 @@ const CADENCE_OPTIONS: { value: Cadence; label: string }[] = [
 ];
 
 /**
+ * Lowercase + NFD + strip combining marks. "Ândrea" -> "andrea",
+ * "JOSÉ" -> "jose". Usado pra casar busca ignorando caixa e acento.
+ */
+function normalizeText(value: string): string {
+  return value.normalize("NFD").replace(/\p{Diacritic}/gu, "").toLowerCase();
+}
+
+/**
+ * Separa o query em tokens por espaço; todo token precisa estar presente
+ * como substring do nome normalizado (AND, nao OR). String vazia = sem filtro.
+ */
+function tokenize(query: string): string[] {
+  return query
+    .split(/\s+/)
+    .map((t) => normalizeText(t.trim()))
+    .filter((t) => t.length > 0);
+}
+
+/**
  * Lista de amigos com filtros (categoria, cadencia, tag) + CRUD.
  *
  * Os filtros sao repassados ao backend (`/api/friends?category=...`) em
@@ -50,6 +69,7 @@ function FriendsPage() {
   const [mergeOpen, setMergeOpen] = useState(false);
   const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
   const [initial, setInitial] = useState<string | null>(null);
+  const [query, setQuery] = useState("");
 
   const list = useFetch(() => friendsApi.list(filters), [
     filters.category,
@@ -57,26 +77,39 @@ function FriendsPage() {
     filters.tag,
   ]);
 
+  // Aplica a busca por nome (tokens AND, case/acento insensivel) antes
+  // de derivar contagens e visibilidade. Se a query e vazia, e a lista
+  // inteira do backend.
+  const filteredByQuery = useMemo(() => {
+    const tokens = tokenize(query);
+    const all = list.data ?? [];
+    if (tokens.length === 0) return all;
+    return all.filter((f) => {
+      const normalized = normalizeText(f.name);
+      return tokens.every((t) => normalized.includes(t));
+    });
+  }, [list.data, query]);
+
   // Contagem de amigos por inicial (para o AlphabetNav). Calculada sobre
-  // a lista ja filtrada pelo backend — combina com category/cadence/tag.
+  // a lista ja filtrada por backend + busca — as letras refletem o que
+  // o usuario ve e nao um total fantasma.
   const initialCounts = useMemo(() => {
     const counts: Record<string, number> = {};
-    for (const f of list.data ?? []) {
+    for (const f of filteredByQuery) {
       const key = nameInitial(f.name);
       counts[key] = (counts[key] ?? 0) + 1;
     }
     return counts;
-  }, [list.data]);
+  }, [filteredByQuery]);
 
   // Lista efetivamente visivel depois do filtro de inicial. Se a letra
   // ativa perde todos os amigos (ex.: apos delete ou mudanca de filtro),
-  // caimos em `list.data` sem aviso — o AlphabetNav mostra a letra
+  // caimos em `filteredByQuery` sem aviso — o AlphabetNav mostra a letra
   // desabilitada e o usuario clica noutra.
   const visibleFriends = useMemo(() => {
-    const all = list.data ?? [];
-    if (!initial) return all;
-    return all.filter((f) => nameInitial(f.name) === initial);
-  }, [list.data, initial]);
+    if (!initial) return filteredByQuery;
+    return filteredByQuery.filter((f) => nameInitial(f.name) === initial);
+  }, [filteredByQuery, initial]);
 
   // Ids visiveis na pagina (respeitando todos os filtros, inclusive o
   // de inicial). Base pro "selecionar todos" e pra limpar selecao.
@@ -258,6 +291,7 @@ function FriendsPage() {
   };
 
   const activeFiltersCount = Object.values(filters).filter(Boolean).length;
+  const hasQuery = tokenize(query).length > 0;
 
   return (
     <div className="space-y-5">
@@ -267,10 +301,12 @@ function FriendsPage() {
           <p className="text-sm text-slate-500">
             {list.data
               ? initial
-                ? `${visibleFriends.length} em ${initial} · ${list.data.length} total`
+                ? `${visibleFriends.length} em ${initial} · ${filteredByQuery.length}${hasQuery ? " na busca" : ""} · ${list.data.length} total`
+                : hasQuery
+                ? `${filteredByQuery.length} para "${query.trim()}" · ${list.data.length} total`
                 : `${list.data.length} resultados`
               : "carregando..."}
-            {(activeFiltersCount > 0 || initial) && (
+            {(activeFiltersCount > 0 || initial || hasQuery) && (
               <>
                 {" · "}
                 <button
@@ -278,6 +314,7 @@ function FriendsPage() {
                   onClick={() => {
                     setFilters({});
                     setInitial(null);
+                    setQuery("");
                   }}
                   className="underline hover:text-slate-700"
                 >
@@ -305,31 +342,58 @@ function FriendsPage() {
         </div>
       </header>
 
-      <section className="grid grid-cols-1 gap-2 rounded-xl bg-white p-3 ring-1 ring-inset ring-slate-200 sm:grid-cols-3">
-        <FilterSelect
-          label="Categoria"
-          value={filters.category ?? ""}
-          options={CATEGORY_OPTIONS}
-          onChange={(v) => updateFilter("category", v as Category | "")}
-        />
-        <FilterSelect
-          label="Cadência"
-          value={filters.cadence ?? ""}
-          options={CADENCE_OPTIONS}
-          onChange={(v) => updateFilter("cadence", v as Cadence | "")}
-        />
+      <section className="space-y-3 rounded-xl bg-white p-3 ring-1 ring-inset ring-slate-200">
         <label className="block">
           <span className="mb-1 block text-xs font-medium text-slate-600">
-            Tag
+            Buscar por nome
           </span>
-          <input
-            type="text"
-            value={filters.tag ?? ""}
-            placeholder="ex: rpg"
-            onChange={(e) => updateFilter("tag", e.target.value)}
-            className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-slate-400"
-          />
+          <div className="relative">
+            <input
+              type="search"
+              value={query}
+              placeholder="ex: ana sil"
+              onChange={(e) => setQuery(e.target.value)}
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 pr-8 text-sm outline-none focus:ring-2 focus:ring-slate-400"
+              aria-label="Buscar amigos por nome"
+            />
+            {query.length > 0 && (
+              <button
+                type="button"
+                onClick={() => setQuery("")}
+                aria-label="Limpar busca"
+                className="absolute inset-y-0 right-2 my-auto flex size-5 items-center justify-center rounded text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                ✕
+              </button>
+            )}
+          </div>
         </label>
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <FilterSelect
+            label="Categoria"
+            value={filters.category ?? ""}
+            options={CATEGORY_OPTIONS}
+            onChange={(v) => updateFilter("category", v as Category | "")}
+          />
+          <FilterSelect
+            label="Cadência"
+            value={filters.cadence ?? ""}
+            options={CADENCE_OPTIONS}
+            onChange={(v) => updateFilter("cadence", v as Cadence | "")}
+          />
+          <label className="block">
+            <span className="mb-1 block text-xs font-medium text-slate-600">
+              Tag
+            </span>
+            <input
+              type="text"
+              value={filters.tag ?? ""}
+              placeholder="ex: rpg"
+              onChange={(e) => updateFilter("tag", e.target.value)}
+              className="w-full rounded-md border border-slate-200 bg-white px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-slate-400"
+            />
+          </label>
+        </div>
       </section>
 
       {list.data && list.data.length > 0 && (
@@ -337,7 +401,7 @@ function FriendsPage() {
           counts={initialCounts}
           active={initial}
           onSelect={setInitial}
-          totalCount={list.data.length}
+          totalCount={filteredByQuery.length}
         />
       )}
 
@@ -367,7 +431,11 @@ function FriendsPage() {
               ? activeFiltersCount > 0
                 ? "Nenhum amigo corresponde aos filtros."
                 : "Nenhum amigo cadastrado ainda. Crie o primeiro."
-              : `Nenhum amigo começa com "${initial}".`}
+              : filteredByQuery.length === 0 && hasQuery
+              ? `Nenhum amigo corresponde a "${query.trim()}".`
+              : initial
+              ? `Nenhum amigo começa com "${initial}"${hasQuery ? ` para "${query.trim()}"` : ""}.`
+              : "Nenhum amigo corresponde aos filtros."}
           </div>
         ) : (
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">

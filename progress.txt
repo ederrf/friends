@@ -25,6 +25,24 @@ Proximo passo sugerido:
 - item
 
 Data: 2026-04-20
+Iteracao: Busca por nome na lista de amigos (13.22, acao adicional)
+Resumo: Input de busca adicionado ao topo do card de filtros; tokens separados por espaco casam em AND como substrings do nome (case e acento insensiveis via NFD + strip combining marks + lowercase). "ana sil" casa "Ana Silva" e "Mariana Silveira"; "JOSÉ" casa "jose carlos". Busca combina com category/cadence/tag do backend e com o navegador A-Z — as contagens por letra se adaptam conforme o usuario digita (letras sem match ficam desabilitadas). Botao ✕ limpa a busca rapido, "limpar filtros" tambem zera o query. Vazio continua devolvendo a lista completa.
+Decisoes:
+- Frontend-only: a lista do backend ja vem inteira, e a busca precisa da lista completa pra calcular as contagens do AlphabetNav de qualquer forma. Zero round-trip = feedback instantaneo enquanto digita.
+- AND entre tokens (nao OR) — comum em sistemas de busca e condizente com o caso de uso ("ana sil" deve estreitar, nao alargar).
+- Normalizacao NFD + `\p{Diacritic}` + lowercase: funciona pra portugues (José/jose), alemao (Müller/muller), etc., sem depender de tabela manual.
+- Contador no header muda de formato quando ha query: "N para 'ana' · M total" (ou "... em A · ... na busca · ... total" se tambem tem letra ativa) pra deixar claro o que foi filtrado onde.
+- Mensagem do empty-state conta o que foi procurado em ordem de especificidade: backend vazio > busca sem match > letra sem match > fallback.
+Arquivos alterados:
+- frontend/src/pages/FriendsPage.tsx (normalizeText, tokenize, state query, memo filteredByQuery, input de busca, updates em header/empty-state/limpar-filtros)
+- PRD.md (atividade adicional em 13.22 marcada Sim)
+- progress.txt (esta entrada)
+Pendencias:
+- 13.13 Google Calendar (unica iteracao do escopo original em aberto).
+Proximo passo sugerido:
+- Nao ha; busca esta funcional. Eventual ajuste: marcar o trecho que casou em bold no nome, ou permitir tokens com aspas para match exato.
+
+Data: 2026-04-20
 Iteracao: Navegador A-Z na lista de amigos (13.22, acao adicional)
 Resumo: Strip A-Z acima da lista com contagem por letra; clicar em uma letra filtra os amigos cujo nome comeca com ela, clicar de novo limpa. Letras sem amigos ficam desabilitadas para indicar gaps. Funciona junto com os filtros existentes (category/cadence/tag) — conta e filtra em cima da lista ja retornada pelo backend.
 Decisoes:

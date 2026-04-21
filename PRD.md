@@ -880,6 +880,9 @@ Feito: Sim
 Atividade: navegador A-Z acima da lista com contagem por letra e normalizacao de acentos — filtra frontend-only em cima da lista ja filtrada pelo backend
 Feito: Sim
 
+Atividade: busca por nome no topo dos filtros — tokens separados por espaco em AND, case/acento insensivel, com botao de limpar e contagens do navegador A-Z adaptativas
+Feito: Sim
+
 ## 14. Ordem recomendada de implementacao
 
 1. Estruturar repositorio real com frontend e backend.
